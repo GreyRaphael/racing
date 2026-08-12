@@ -3,6 +3,7 @@ export class AudioSystem {
   private engineOscillator: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
   private enabled = true;
+  private readonly lastPlayed = new Map<string, number>();
 
   initialize(): void {
     if (!this.enabled || this.context) return;
@@ -31,11 +32,11 @@ export class AudioSystem {
     this.engineGain.gain.setTargetAtTime(0.012 + magnitude * 0.035, now, 0.08);
   }
 
-  countdown(): void { this.beep(440, 0.09); }
-  finish(): void { this.beep(740, 0.18); }
-  collision(): void { this.beep(115, 0.1); }
-  grass(): void { this.beep(82, 0.045); }
-  drift(): void { this.beep(210, 0.045); }
+  countdown(): void { this.playThrottled('countdown', 440, 0.09, 0); }
+  finish(): void { this.playThrottled('finish', 740, 0.18, 0); }
+  collision(): void { this.playThrottled('collision', 115, 0.1, 0.12); }
+  grass(): void { this.playThrottled('grass', 82, 0.045, 0.16); }
+  drift(): void { this.playThrottled('drift', 210, 0.045, 0.09); }
 
   dispose(): void {
     this.engineOscillator?.stop();
@@ -43,6 +44,13 @@ export class AudioSystem {
     this.engineOscillator = null;
     this.engineGain = null;
     this.context = null;
+  }
+
+  private playThrottled(key: string, frequency: number, duration: number, cooldown: number): void {
+    const now = performance.now() / 1000;
+    if ((this.lastPlayed.get(key) ?? -Infinity) + cooldown > now) return;
+    this.lastPlayed.set(key, now);
+    this.beep(frequency, duration);
   }
 
   private beep(frequency: number, duration: number): void {

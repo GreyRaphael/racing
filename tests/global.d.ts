@@ -8,6 +8,7 @@ declare global {
       finishRace: () => void;
       completeLap: () => void;
       setPlayerLateral: (offset: number) => boolean;
+      setPlayerProgress: (progress: number, lateralOffset?: number) => boolean;
       resetPlayer: () => void;
       getStorage: () => unknown;
     };

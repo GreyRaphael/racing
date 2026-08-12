@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COLORS, GRASS_FENCE_LIMIT, ROAD_HALF_WIDTH, TRACK_SAMPLE_COUNT, UP, clamp, wrapProgress } from '../constants';
+import { COLORS, GRASS_FENCE_LIMIT, ROAD_HALF_WIDTH, TRACK_SAMPLE_COUNT, UP, wrapProgress } from '../constants';
 
 export interface TrackSample {
   position: THREE.Vector3;
@@ -60,7 +60,8 @@ export class Track {
   getPose(progress: number, lateralOffset = 0): { position: THREE.Vector3; tangent: THREE.Vector3; yaw: number } {
     const sample = this.getSampleAtProgress(progress);
     const position = sample.position.clone().addScaledVector(sample.lateral, lateralOffset);
-    const yaw = Math.atan2(sample.tangent.x, -sample.tangent.z);
+    // Kart visuals point along local -Z, so this yaw makes their nose follow the tangent.
+    const yaw = Math.atan2(-sample.tangent.x, -sample.tangent.z);
     return { position, tangent: sample.tangent, yaw };
   }
 
@@ -124,37 +125,52 @@ export class Track {
       const left = sample.position.clone().addScaledVector(sample.lateral, -half);
       const right = sample.position.clone().addScaledVector(sample.lateral, half);
       roadPositions.push(left.x, 0.04, left.z, right.x, 0.04, right.z);
-      const nextSample = this.samples[nextIndex];
-      const nextLeft = nextSample.position.clone().addScaledVector(nextSample.lateral, -half);
-      const nextRight = nextSample.position.clone().addScaledVector(nextSample.lateral, half);
-      if (i < this.samples.length) {
-        const base = i * 2;
-        const nextBase = ((i + 1) % this.samples.length) * 2;
-        roadIndices.push(base, nextBase, base + 1, base + 1, nextBase, nextBase + 1);
-      }
+
+      const base = i * 2;
+      const nextBase = ((i + 1) % this.samples.length) * 2;
+      // The left/right ribbon must wind counter-clockwise when viewed from above.
+      // The previous order produced downward normals, so the road was back-face culled.
+      roadIndices.push(base, base + 1, nextBase, base + 1, nextBase + 1, nextBase);
       const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth));
       const rightEdge = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth);
-      edgePositions.push(leftEdge.x, 0.055, leftEdge.z, rightEdge.x, 0.055, rightEdge.z);
-      edgePositions.push(left.x, 0.058, left.z, right.x, 0.058, right.z);
+      // Four vertices make two narrow shoulder strips. Building outer-left to outer-right
+      // here would cover the entire asphalt ribbon with the shoulder material.
+      edgePositions.push(
+        leftEdge.x, 0.055, leftEdge.z,
+        left.x, 0.058, left.z,
+        right.x, 0.058, right.z,
+        rightEdge.x, 0.055, rightEdge.z,
+      );
       const edgeBase = i * 4;
       const edgeNext = ((i + 1) % this.samples.length) * 4;
-      edgeIndices.push(edgeBase, edgeNext, edgeBase + 1, edgeBase + 1, edgeNext, edgeNext + 1);
-      edgeIndices.push(edgeBase + 2, edgeNext + 2, edgeBase + 3, edgeBase + 3, edgeNext + 2, edgeNext + 3);
-      void nextLeft;
-      void nextRight;
+      edgeIndices.push(edgeBase, edgeBase + 1, edgeNext, edgeBase + 1, edgeNext + 1, edgeNext);
+      edgeIndices.push(edgeBase + 2, edgeBase + 3, edgeNext + 2, edgeBase + 3, edgeNext + 3, edgeNext + 2);
     }
 
     const roadGeometry = new THREE.BufferGeometry();
     roadGeometry.setAttribute('position', new THREE.Float32BufferAttribute(roadPositions, 3));
     roadGeometry.setIndex(roadIndices);
     roadGeometry.computeVertexNormals();
-    this.group.add(new THREE.Mesh(roadGeometry, new THREE.MeshStandardMaterial({ color: COLORS.road, roughness: 0.95 })));
+    const roadMaterial = new THREE.MeshStandardMaterial({
+      color: 0x53656b,
+      roughness: 0.88,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    const road = new THREE.Mesh(roadGeometry, roadMaterial);
+    road.receiveShadow = true;
+    this.group.add(road);
 
     const edgeGeometry = new THREE.BufferGeometry();
     edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
     edgeGeometry.setIndex(edgeIndices);
     edgeGeometry.computeVertexNormals();
-    this.group.add(new THREE.Mesh(edgeGeometry, new THREE.MeshStandardMaterial({ color: COLORS.roadEdge, roughness: 0.8 })));
+    const edge = new THREE.Mesh(
+      edgeGeometry,
+      new THREE.MeshStandardMaterial({ color: 0xf1e8c9, roughness: 0.82, side: THREE.DoubleSide }),
+    );
+    edge.receiveShadow = true;
+    this.group.add(edge);
 
     this.buildCenterMarkers();
     this.buildGuardRails();
@@ -166,7 +182,8 @@ export class Track {
       const sample = this.samples[i];
       const marker = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 1.5), markerMaterial);
       marker.position.copy(sample.position).setY(0.07);
-      marker.rotation.y = Math.atan2(sample.tangent.x, -sample.tangent.z);
+      // The marker depth is local +Z, unlike the kart nose.
+      marker.rotation.y = Math.atan2(sample.tangent.x, sample.tangent.z);
       this.group.add(marker);
     }
 
@@ -177,31 +194,70 @@ export class Track {
         new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xfaf7e9 : COLORS.red, roughness: 0.75 }),
       );
       tile.position.copy(startSample.position).addScaledVector(startSample.lateral, i * 1.13).setY(0.09);
-      tile.rotation.y = Math.atan2(startSample.tangent.x, -startSample.tangent.z);
+      tile.rotation.y = Math.atan2(startSample.tangent.x, startSample.tangent.z);
       this.group.add(tile);
     }
   }
 
   private buildGuardRails(): void {
-    const railMaterial = new THREE.MeshStandardMaterial({ color: COLORS.fence, roughness: 0.7 });
-    const capMaterial = new THREE.MeshStandardMaterial({ color: COLORS.red, roughness: 0.75 });
-    for (let i = 0; i < this.samples.length; i += 15) {
+    const railMaterial = new THREE.MeshStandardMaterial({ color: COLORS.fence, roughness: 0.66 });
+    const postMaterial = new THREE.MeshStandardMaterial({ color: COLORS.red, roughness: 0.72 });
+    const capMaterial = new THREE.MeshStandardMaterial({ color: COLORS.yellow, roughness: 0.72 });
+    const railOffset = this.roadHalfWidth + 1.22;
+    // Connect every post to the next post. The old 15/5 step mismatch left two thirds
+    // of every rail side open, especially noticeable on the long bends.
+    const railStep = 6;
+    const segmentCount = this.samples.length / railStep;
+    const instanceCount = segmentCount * 2;
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.24, 1.08, 0.24), postMaterial, instanceCount);
+    const caps = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.1, 0.3), capMaterial, instanceCount);
+    const upperRails = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.18, 1), railMaterial, instanceCount);
+    const lowerRails = new THREE.InstancedMesh(new THREE.BoxGeometry(0.13, 0.1, 1), railMaterial, instanceCount);
+    for (const mesh of [posts, caps, upperRails, lowerRails]) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = false;
+      this.group.add(mesh);
+    }
+
+    const transform = new THREE.Object3D();
+    let instance = 0;
+    for (let i = 0; i < this.samples.length; i += railStep) {
       const sample = this.samples[i];
+      const next = this.samples[(i + railStep) % this.samples.length];
       for (const side of [-1, 1]) {
-        const postPosition = sample.position.clone().addScaledVector(sample.lateral, side * (this.roadHalfWidth + 1.22));
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.95, 0.22), railMaterial);
-        post.position.copy(postPosition).setY(0.49);
-        this.group.add(post);
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.08, 0.26), capMaterial);
-        cap.position.copy(postPosition).setY(0.98);
-        this.group.add(cap);
-        const next = this.samples[(i + 5) % this.samples.length];
-        const midpoint = sample.position.clone().lerp(next.position, 0.5).addScaledVector(sample.lateral, side * (this.roadHalfWidth + 1.22));
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, sample.position.distanceTo(next.position) + 0.4), railMaterial);
-        rail.position.copy(midpoint).setY(0.74);
-        rail.rotation.y = Math.atan2(next.position.x - sample.position.x, -(next.position.z - sample.position.z));
-        this.group.add(rail);
+        const postPosition = sample.position.clone().addScaledVector(sample.lateral, side * railOffset);
+        const nextPostPosition = next.position.clone().addScaledVector(next.lateral, side * railOffset);
+        const segment = nextPostPosition.clone().sub(postPosition);
+        const midpoint = postPosition.clone().lerp(nextPostPosition, 0.5);
+        // Rail geometry is elongated along local +Z, so align +Z with the segment.
+        const railYaw = Math.atan2(segment.x, segment.z);
+
+        transform.position.copy(postPosition).setY(0.54);
+        transform.rotation.set(0, 0, 0);
+        transform.scale.setScalar(1);
+        transform.updateMatrix();
+        posts.setMatrixAt(instance, transform.matrix);
+
+        transform.position.copy(postPosition).setY(1.12);
+        transform.updateMatrix();
+        caps.setMatrixAt(instance, transform.matrix);
+
+        transform.position.copy(midpoint).setY(0.82);
+        transform.rotation.set(0, railYaw, 0);
+        transform.scale.set(1, 1, segment.length() + 0.16);
+        transform.updateMatrix();
+        upperRails.setMatrixAt(instance, transform.matrix);
+
+        transform.position.copy(midpoint).setY(0.48);
+        transform.scale.set(1, 1, segment.length() + 0.16);
+        transform.updateMatrix();
+        lowerRails.setMatrixAt(instance, transform.matrix);
+        instance += 1;
       }
     }
+    posts.instanceMatrix.needsUpdate = true;
+    caps.instanceMatrix.needsUpdate = true;
+    upperRails.instanceMatrix.needsUpdate = true;
+    lowerRails.instanceMatrix.needsUpdate = true;
   }
 }

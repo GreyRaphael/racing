@@ -26,7 +26,8 @@ export class AiKart extends Kart {
     const lookahead = this.profile.lookahead + Math.min(0.035, Math.abs(this.speed) * 0.0012);
     const target = this.track.getSampleAtProgress(this.progress + lookahead);
     const toTarget = target.position.clone().sub(this.position).setY(0).normalize();
-    const targetYaw = Math.atan2(toTarget.x, -toTarget.z);
+    // AI target yaw uses the same local -Z convention as the kart model.
+    const targetYaw = Math.atan2(-toTarget.x, -toTarget.z);
     const angle = shortestAngle(targetYaw - this.yaw);
     this.steering = clamp(angle / 0.62 + this.profile.steeringBias, -1, 1);
 

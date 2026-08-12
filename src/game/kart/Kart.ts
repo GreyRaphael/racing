@@ -29,6 +29,7 @@ export class Kart {
   lap = 1;
   isOffRoad = false;
   isDrifting = false;
+  collisionCooldown = 0;
   finished = false;
   finishTime: number | null = null;
   private readonly wheelMeshes: THREE.Mesh[] = [];
@@ -42,7 +43,9 @@ export class Kart {
   }
 
   getForward(): THREE.Vector3 {
-    return new THREE.Vector3(Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    // The kart nose is modelled along local -Z. Three.js Y rotation therefore
+    // transforms it to (-sin(yaw), 0, -cos(yaw).
+    return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
   }
 
   getRight(): THREE.Vector3 {
@@ -66,6 +69,7 @@ export class Kart {
     this.finishTime = null;
     this.isOffRoad = false;
     this.isDrifting = false;
+    this.collisionCooldown = 0;
   }
 
   integrate(delta: number): void {

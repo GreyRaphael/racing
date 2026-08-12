@@ -123,7 +123,8 @@ export class Environment {
   private buildStartArch(): void {
     const sample = this.track.samples[0];
     const arch = new THREE.Group();
-    const yaw = Math.atan2(sample.tangent.x, -sample.tangent.z);
+    // The arch spans local X and its depth follows local +Z.
+    const yaw = Math.atan2(sample.tangent.x, sample.tangent.z);
     arch.position.copy(sample.position);
     arch.rotation.y = yaw;
     const postMaterial = new THREE.MeshStandardMaterial({ color: COLORS.red, roughness: 0.75 });

@@ -53,7 +53,7 @@ export class RaceSystem {
     this.lapElapsedTime = 0;
     this.lapTimes.length = 0;
     this.result = null;
-    const grid = [0, -1.9, 1.9, -3.8];
+    const grid = [0, -2.2, 2.2, -4.35];
     this.karts.forEach((kart, index) => {
       kart.resetRaceState();
       kart.placeAt(0.002, grid[index] ?? 0);

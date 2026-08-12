@@ -17,7 +17,7 @@ import { TimeTrialRecords } from '../storage/TimeTrialRecords';
 
 export class Game {
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(59, window.innerWidth / window.innerHeight, 0.1, 300);
+  readonly camera = new THREE.PerspectiveCamera(61, window.innerWidth / window.innerHeight, 0.1, 300);
   readonly renderer: THREE.WebGLRenderer;
   readonly track = new Track();
   readonly environment = new Environment(this.track);
@@ -108,6 +108,8 @@ export class Game {
 
   private step(delta: number): void {
     const canDrive = this.race.isDrivingAllowed();
+    const allKarts = [this.player, ...this.ai];
+    for (const kart of allKarts) kart.collisionCooldown = Math.max(0, kart.collisionCooldown - delta);
     const resetPressed = this.input.consumeReset();
     if (resetPressed && this.race.phase !== 'menu') {
       this.collision.reset(this.player);
@@ -118,9 +120,10 @@ export class Game {
       this.player.update(delta, this.input.state, canDrive);
       const playerRaceProgress = this.player.lap - 1 + this.player.progress;
       for (const kart of this.ai) kart.update(delta, canDrive, playerRaceProgress);
-      const collisions = this.collision.resolve([this.player, ...this.ai]);
+      const collisions = this.collision.resolve(allKarts);
       for (const [kart, result] of collisions) {
-        if (result.fenceHit || result.vehicleHit) {
+        if ((result.fenceHit || result.vehicleHit) && kart.collisionCooldown <= 0) {
+          kart.collisionCooldown = 0.18;
           this.audio.collision();
           this.particles.burst(kart.position);
         } else if (result.grassEntered) {
@@ -199,6 +202,14 @@ export class Game {
       },
       setPlayerLateral: (offset: number) => {
         this.collision.forceToOffset(this.player, offset);
+        return true;
+      },
+      setPlayerProgress: (progress: number, lateralOffset = 0) => {
+        this.player.placeAt(progress, lateralOffset);
+        this.player.speed = 0;
+        this.player.updateTrackQuery();
+        this.cameraSystem.update(1 / 60, this.player);
+        this.hud.update(this.race, this.player);
         return true;
       },
       resetPlayer: () => this.collision.reset(this.player),

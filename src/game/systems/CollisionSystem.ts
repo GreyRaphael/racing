@@ -22,7 +22,7 @@ export class CollisionSystem {
         const safeOffset = Math.sign(query.lateralOffset || 1) * (this.track.fenceLimit - 0.15);
         kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, safeOffset).setY(0.23);
         kart.speed *= -0.18;
-        kart.yaw = Math.atan2(query.sample.tangent.x, -query.sample.tangent.z);
+        kart.yaw = Math.atan2(-query.sample.tangent.x, -query.sample.tangent.z);
         fenceHit = true;
       }
       kart.updateTrackQuery();
@@ -56,7 +56,7 @@ export class CollisionSystem {
   reset(kart: Kart): void {
     const query = this.track.getNearest(kart.position);
     kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, 0).setY(0.23);
-    kart.yaw = Math.atan2(query.sample.tangent.x, -query.sample.tangent.z);
+    kart.yaw = Math.atan2(-query.sample.tangent.x, -query.sample.tangent.z);
     kart.speed = 0;
     kart.steering = 0;
     kart.updateTrackQuery();
