@@ -9,7 +9,6 @@ export const GRASS_FENCE_LIMIT = 6.4;
 export const KART_COLLISION_DISTANCE = 1.6;
 export const COLLISION_RESTITUTION = 0.48;
 export const DESTROY_CLOSING_SPEED = 4.5;
-export const TRACK_LENGTH = 0;
 export const COLORS = {
   sky: 0x9bdcf5,
   grass: 0x76b85e,

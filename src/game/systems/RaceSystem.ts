@@ -84,6 +84,10 @@ export class RaceSystem {
     this.elapsedTime += delta;
     this.lapElapsedTime += delta;
     for (const kart of this.karts) this.processLap(kart);
+    // The race ends the moment the player crosses the finish line. AI that
+    // have not completed all laps are ranked by track progress instead of by
+    // finish time, so the standings reflect the order at the moment of the
+    // player's finish rather than forcing every AI to complete the race.
     if (this.player.finished) this.finishRace();
   }
 
@@ -175,6 +179,9 @@ export class RaceSystem {
 
   private finishRace(): void {
     if (this.phase === 'results') return;
+    // Intentional:结算以玩家完赛为触发点。未完赛 AI 通过 getRanking 按
+    // 赛道进度排序展示"进行中"状态，而非等待所有 AI 跑完。设计上把玩家
+    // 体验放在首位，多人赛的最终名次因此反映玩家冲线瞬间的场上态势。
     this.phase = 'results';
     const totalTime = Math.max(0, this.elapsedTime);
     const lapTimes = this.lapTimes.slice(0, this.totalLaps);

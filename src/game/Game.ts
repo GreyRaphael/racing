@@ -246,6 +246,7 @@ export class Game {
   }
 
   private syncAfterDebugCommand(): void {
+    this.hud.refreshRecord();
     this.hud.update(this.race, this.player);
     if (this.race.phase !== this.lastPhase) {
       this.handlePhaseChange();

@@ -24,16 +24,23 @@ export class Hud {
     this.root.classList.remove('hidden');
     this.modeLabel.textContent = mode === 'race' ? '多人比赛' : '个人计时赛';
     this.positionCard.classList.toggle('hidden', mode !== 'race');
+    this.refreshRecord();
   }
 
   hide(): void { this.root.classList.add('hidden'); }
+
+  // Best-lap record only changes when finishRace saves a result, at which
+  // point the HUD is hidden behind the results panel. Re-fetch on demand
+  // instead of parsing localStorage on every animation frame.
+  refreshRecord(): void {
+    const record = this.records.load();
+    this.bestLap.textContent = record.bestLapTime === null ? '最佳 —' : `最佳 ${formatTime(record.bestLapTime)}`;
+  }
 
   update(race: RaceSystem, player: PlayerKart): void {
     this.lap.innerHTML = `${Math.min(player.lap, race.totalLaps)} <small>/ ${race.totalLaps}</small>`;
     this.lapTime.textContent = formatTime(race.currentLapTime);
     this.raceTime.textContent = formatTime(race.elapsedTime);
-    const record = this.records.load();
-    this.bestLap.textContent = record.bestLapTime === null ? '最佳 —' : `最佳 ${formatTime(record.bestLapTime)}`;
     this.speed.textContent = Math.round(Math.abs(player.speed) * 3.6).toString();
     this.progressFill.style.width = `${Math.round(player.progress * 1000) / 10}%`;
     this.driftIndicator.classList.toggle('active', player.isDrifting);
