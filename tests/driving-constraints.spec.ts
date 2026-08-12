@@ -18,6 +18,25 @@ test('倒计时后 W 可加速，Space 可观测漂移', async ({ page }) => {
   await page.keyboard.up(' ');
 });
 
+test('D 右转、A 左转', async ({ page }) => {
+  await startMode(page);
+  await debugAdvance(page, 4);
+  const initial = await debugState(page);
+  const initialYaw = (initial.player as { yaw: number }).yaw;
+
+  await page.keyboard.down('d');
+  await debugAdvance(page, 0.25);
+  const afterRight = await debugState(page);
+  await page.keyboard.up('d');
+  expect((afterRight.player as { yaw: number }).yaw).toBeLessThan(initialYaw);
+
+  await page.keyboard.down('a');
+  await debugAdvance(page, 0.25);
+  const afterLeft = await debugState(page);
+  await page.keyboard.up('a');
+  expect((afterLeft.player as { yaw: number }).yaw).toBeGreaterThan((afterRight.player as { yaw: number }).yaw);
+});
+
 test('越过护栏会被修正，R 回到最近赛道位置', async ({ page }) => {
   await startMode(page);
   await debugAdvance(page, 4);

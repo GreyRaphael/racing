@@ -29,7 +29,9 @@ export class AiKart extends Kart {
     // AI target yaw uses the same local -Z convention as the kart model.
     const targetYaw = Math.atan2(-toTarget.x, -toTarget.z);
     const angle = shortestAngle(targetYaw - this.yaw);
-    this.steering = clamp(angle / 0.62 + this.profile.steeringBias, -1, 1);
+    // A target on the kart's right has a negative yaw delta; convert that
+    // into the public positive-right steering convention.
+    this.steering = clamp(-angle / 0.62 + this.profile.steeringBias, -1, 1);
 
     const farther = this.track.getSampleAtProgress(this.progress + 0.025).tangent;
     const curveTightness = 1 - clamp(target.tangent.dot(farther), 0, 1);

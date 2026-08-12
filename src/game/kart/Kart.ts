@@ -49,7 +49,8 @@ export class Kart {
   }
 
   getRight(): THREE.Vector3 {
-    return new THREE.Vector3(Math.cos(this.yaw), 0, Math.sin(this.yaw));
+    // local +X is the kart's right side after a Y rotation
+    return new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
   }
 
   placeAt(progress: number, lateralOffset = 0): void {
@@ -74,7 +75,9 @@ export class Kart {
 
   integrate(delta: number): void {
     this.position.addScaledVector(this.getForward(), this.speed * delta);
-    this.yaw += this.steering * (0.45 + Math.min(1, Math.abs(this.speed) / 15) * 1.2) * delta;
+    // Positive steering means right. With a local -Z nose, right-turning
+    // decreases the Three.js Y rotation.
+    this.yaw -= this.steering * (0.45 + Math.min(1, Math.abs(this.speed) / 15) * 1.2) * delta;
     this.updateVisual(delta);
   }
 
@@ -90,7 +93,7 @@ export class Kart {
     const targetLean = -this.steering * Math.min(0.08, Math.abs(this.speed) * 0.006);
     this.group.rotation.z = damp(this.group.rotation.z, targetLean, 8, Math.max(0.001, delta));
     for (const wheel of this.wheelMeshes) wheel.rotation.x -= this.speed * Math.max(0.001, delta) * 1.5;
-    this.frontWheelGroup.rotation.y = this.steering * 0.32;
+    this.frontWheelGroup.rotation.y = -this.steering * 0.32;
   }
 
   getDebugState(): KartDebugState {
