@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8dd8f7" />
+    <title>阳光草原卡丁车</title>
+  </head>
+  <body>
+    <main id="app" aria-label="阳光草原卡丁车赛车游戏">
+      <canvas id="game-canvas" aria-label="3D 赛车场景"></canvas>
+
+      <section id="menu-screen" class="screen-layer" aria-label="主菜单">
+        <div class="menu-card">
+          <p class="eyebrow">SUNNY MEADOW CIRCUIT</p>
+          <h1>阳光草原<br /><span>卡丁车</span></h1>
+          <p class="subtitle">在微风、花朵和急弯之间，跑出你的最佳圈速。</p>
+          <div id="mode-menu" data-testid="mode-menu" class="mode-menu" role="group" aria-label="选择比赛模式">
+            <button id="time-trial-mode" data-testid="time-trial-mode" class="mode-button selected" type="button" aria-pressed="true">
+              <span class="mode-icon">◷</span>
+              <span><strong>个人计时赛</strong><small>挑战自己的最佳纪录</small></span>
+            </button>
+            <button id="race-mode" data-testid="race-mode" class="mode-button" type="button" aria-pressed="false">
+              <span class="mode-icon">♛</span>
+              <span><strong>多人比赛</strong><small>与 3 名 AI 车手争夺冠军</small></span>
+            </button>
+          </div>
+          <button id="start-race" data-testid="start-race" class="primary-button" type="button">开始计时赛 <span>→</span></button>
+          <div class="controls-hint"><span>WASD</span> 驾驶 <span>SPACE</span> 漂移 <span>R</span> 重置</div>
+        </div>
+        <div class="menu-record" id="menu-record">最佳总时间 — <span>暂无记录</span></div>
+      </section>
+
+      <section id="race-hud" data-testid="race-hud" class="hud-layer hidden" aria-label="比赛信息">
+        <div class="hud-topline">
+          <div class="brand-mark">SMC <span>•</span> 01</div>
+          <div id="mode-label" data-testid="mode-label">个人计时赛</div>
+          <div class="hud-status"><span class="status-dot"></span><span id="speed-value">0</span> KM/H</div>
+        </div>
+        <div class="hud-main">
+          <div class="lap-card glass-card">
+            <span class="hud-label">LAP</span>
+            <strong id="lap-counter" data-testid="lap-counter">1 <small>/ 3</small></strong>
+            <span id="lap-time" class="sub-value">00:00.000</span>
+          </div>
+          <div id="position-card" class="position-card glass-card hidden">
+            <span class="hud-label">POSITION</span>
+            <strong id="position-counter" data-testid="position-counter">1 <small>/ 4</small></strong>
+            <span id="leader-name" class="sub-value">领先：你</span>
+          </div>
+          <div class="timer-card glass-card">
+            <span class="hud-label">TIME</span>
+            <strong id="race-time" data-testid="race-time">00:00.000</strong>
+            <span id="best-lap" class="sub-value">最佳 —</span>
+          </div>
+        </div>
+        <div id="countdown" data-testid="countdown" class="countdown hidden" aria-live="assertive"></div>
+        <div class="hud-bottom">
+          <div class="progress-track"><span id="progress-fill"></span></div>
+          <div class="input-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 驾驶　<kbd>SPACE</kbd> 漂移　<kbd>R</kbd> 重置</div>
+          <div id="drift-indicator" data-testid="drift-indicator" class="drift-indicator">DRIFT READY</div>
+        </div>
+      </section>
+
+      <section id="results-panel" data-testid="results-panel" class="screen-layer hidden" aria-label="比赛结算" aria-live="polite">
+        <div class="results-card">
+          <p class="eyebrow">FINISH LINE</p>
+          <h2 id="results-title">漂亮完赛！</h2>
+          <p id="results-caption" class="subtitle">你的草原圈速记录</p>
+          <div class="result-stats">
+            <div><span>总时间</span><strong id="result-total-time">00:00.000</strong></div>
+            <div><span>最佳单圈</span><strong id="result-best-lap">00:00.000</strong></div>
+          </div>
+          <div id="results-ranking" class="results-ranking"></div>
+          <div class="result-actions">
+            <button id="restart-race" data-testid="restart-race" class="primary-button" type="button">再来一局 <span>↻</span></button>
+            <button id="back-to-menu" data-testid="back-to-menu" class="secondary-button" type="button">返回主菜单</button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
