@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COLORS, clamp, damp } from '../constants';
+import { COLORS, clamp, damp, shortestAngle } from '../constants';
 import { Track } from '../track/Track';
 
 export interface KartDebugState {
@@ -58,6 +58,22 @@ export class Kart {
   getRight(): THREE.Vector3 {
     // local +X is the kart's right side after a Y rotation
     return new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+  }
+
+  getVelocity(): THREE.Vector3 {
+    return this.getForward().multiplyScalar(this.speed).add(this.getRight().multiplyScalar(this.lateralVelocity));
+  }
+
+  setVelocity(velocity: THREE.Vector3): void {
+    this.speed = velocity.dot(this.getForward());
+    this.lateralVelocity = velocity.dot(this.getRight());
+  }
+
+  alignToVelocity(velocity: THREE.Vector3, amount: number): void {
+    const flatVelocity = velocity.clone().setY(0);
+    if (flatVelocity.lengthSq() < 0.01) return;
+    const desiredYaw = Math.atan2(-flatVelocity.x, -flatVelocity.z);
+    this.yaw += shortestAngle(desiredYaw - this.yaw) * clamp(amount, 0, 1);
   }
 
   placeAt(progress: number, lateralOffset = 0): void {

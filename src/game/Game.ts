@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COLORS } from './constants';
+import { COLORS, DESTROY_CLOSING_SPEED } from './constants';
 import { Environment } from './track/Environment';
 import { Track } from './track/Track';
 import { AiKart } from './kart/AiKart';
@@ -139,7 +139,16 @@ export class Game {
       for (const collision of collisionResolution.vehicleCollisions) {
         // Only an opponent in front is removed. The rear kart keeps its speed,
         // steering and drift state instead of exchanging velocities and sticking.
-        if (collision.front !== this.player && !collision.front.destroyed) {
+        if (
+          collision.front !== this.player &&
+          collision.destructiveCandidate &&
+          collision.closingSpeed >= DESTROY_CLOSING_SPEED &&
+          !collision.front.destroyed
+        ) {
+          collision.rear.speed = collision.rearSpeed;
+          collision.rear.lateralVelocity = collision.rearLateralVelocity;
+          collision.rear.yaw = collision.rearYaw;
+          collision.rear.updateVisual(0);
           collision.front.destroyFor(3);
           this.audio.collision();
           this.particles.burst(collision.front.position);

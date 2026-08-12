@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { KART_COLLISION_DISTANCE, clamp } from '../constants';
+import { COLLISION_RESTITUTION, DESTROY_CLOSING_SPEED, KART_COLLISION_DISTANCE, clamp } from '../constants';
 import { Kart } from '../kart/Kart';
 import { Track } from '../track/Track';
 
@@ -12,6 +12,12 @@ export interface CollisionResult {
 export interface VehicleCollision {
   front: Kart;
   rear: Kart;
+  closingSpeed: number;
+  rearImpact: boolean;
+  rearSpeed: number;
+  rearLateralVelocity: number;
+  rearYaw: number;
+  destructiveCandidate: boolean;
 }
 
 export interface CollisionResolution {
@@ -36,11 +42,18 @@ export class CollisionSystem {
         const safeOffset = side * (this.track.fenceLimit - 0.15);
         kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, safeOffset).setY(0.23);
 
-        // Reflect only a small amount of velocity. The position clamp is the
-        // rigid wall; the negative speed/lateral component is the soft bounce.
-        const outwardSpeed = kart.getForward().dot(outward) * kart.speed + kart.getRight().dot(outward) * kart.lateralVelocity;
-        if (outwardSpeed > 0) kart.speed = -Math.min(Math.abs(kart.speed) * 0.2, 4);
-        kart.lateralVelocity *= -0.2;
+        // Reflect the world velocity against the wall normal while retaining
+        // tangential speed. This produces a soft, angled bounce instead of a
+        // hard stop or a forced reset to the track tangent.
+        const velocity = kart.getVelocity();
+        const outwardSpeed = velocity.dot(outward);
+        if (outwardSpeed > 0) {
+          const reflected = velocity.addScaledVector(outward, -outwardSpeed * (1 + COLLISION_RESTITUTION)).multiplyScalar(0.92);
+          kart.alignToVelocity(reflected, 0.3);
+          kart.setVelocity(reflected);
+        } else {
+          kart.lateralVelocity *= -0.18;
+        }
         fenceHit = true;
       }
       kart.updateTrackQuery();
@@ -60,8 +73,43 @@ export class CollisionSystem {
         const overlap = KART_COLLISION_DISTANCE - distance;
         a.position.addScaledVector(normal, overlap * 0.5);
         b.position.addScaledVector(normal, -overlap * 0.5);
+
         const [front, rear] = this.findFrontAndRear(a, b);
-        vehicleCollisions.push({ front, rear });
+        const rearVelocity = rear.getVelocity();
+        const frontVelocity = front.getVelocity();
+        const rearSpeedBefore = rear.speed;
+        const rearLateralVelocityBefore = rear.lateralVelocity;
+        const rearYawBefore = rear.yaw;
+        const impactDirection = front.position.clone().sub(rear.position).setY(0).normalize();
+        const closingSpeed = rearVelocity.clone().sub(frontVelocity).dot(impactDirection);
+        const rearImpact = rear.getForward().dot(impactDirection) > 0.35;
+        const destructiveCandidate = rearImpact && closingSpeed >= DESTROY_CLOSING_SPEED;
+
+        // Resolve every non-destroying impact elastically. Only the component
+        // along the collision normal changes; tangential drift is preserved.
+        const velocityA = a.getVelocity();
+        const velocityB = b.getVelocity();
+        const relativeNormalSpeed = velocityA.clone().sub(velocityB).dot(normal);
+        if (relativeNormalSpeed < 0) {
+          const impulse = -(1 + COLLISION_RESTITUTION) * relativeNormalSpeed * 0.5;
+          velocityA.addScaledVector(normal, impulse);
+          velocityB.addScaledVector(normal, -impulse);
+          a.alignToVelocity(velocityA, 0.18);
+          b.alignToVelocity(velocityB, 0.18);
+          a.setVelocity(velocityA);
+          b.setVelocity(velocityB);
+        }
+
+        vehicleCollisions.push({
+          front,
+          rear,
+          closingSpeed,
+          rearImpact,
+          rearSpeed: rearSpeedBefore,
+          rearLateralVelocity: rearLateralVelocityBefore,
+          rearYaw: rearYawBefore,
+          destructiveCandidate,
+        });
         const aResult = results.get(a);
         const bResult = results.get(b);
         if (aResult) aResult.vehicleHit = true;
