@@ -13,6 +13,8 @@ export interface KartDebugState {
   lap: number;
   isOffRoad: boolean;
   isDrifting: boolean;
+  lateralVelocity: number;
+  destroyed: boolean;
   finished: boolean;
 }
 
@@ -29,8 +31,13 @@ export class Kart {
   lap = 1;
   isOffRoad = false;
   isDrifting = false;
+  lateralVelocity = 0;
+  destroyed = false;
   collisionCooldown = 0;
   finished = false;
+  private recoveryTimer = 0;
+  private recoveryProgress = 0;
+  private recoveryLateral = 0;
   finishTime: number | null = null;
   private readonly wheelMeshes: THREE.Mesh[] = [];
   private readonly frontWheelGroup = new THREE.Group();
@@ -65,20 +72,54 @@ export class Kart {
   resetRaceState(): void {
     this.speed = 0;
     this.steering = 0;
+    this.lateralVelocity = 0;
     this.lap = 1;
+    this.destroyed = false;
+    this.recoveryTimer = 0;
     this.finished = false;
     this.finishTime = null;
     this.isOffRoad = false;
     this.isDrifting = false;
     this.collisionCooldown = 0;
+    this.group.visible = true;
   }
 
   integrate(delta: number): void {
     this.position.addScaledVector(this.getForward(), this.speed * delta);
+    this.position.addScaledVector(this.getRight(), this.lateralVelocity * delta);
     // Positive steering means right. With a local -Z nose, right-turning
     // decreases the Three.js Y rotation.
     this.yaw -= this.steering * (0.45 + Math.min(1, Math.abs(this.speed) / 15) * 1.2) * delta;
+    const grip = this.isDrifting ? 2.4 : 9;
+    this.lateralVelocity = damp(this.lateralVelocity, 0, grip, delta);
     this.updateVisual(delta);
+  }
+
+  destroyFor(seconds = 3): void {
+    if (this.destroyed || this.finished) return;
+    this.destroyed = true;
+    this.recoveryTimer = seconds;
+    this.recoveryProgress = this.progress;
+    this.recoveryLateral = clamp(this.lateralOffset, -this.track.roadHalfWidth * 0.75, this.track.roadHalfWidth * 0.75);
+    this.speed = 0;
+    this.lateralVelocity = 0;
+    this.steering = 0;
+    this.group.visible = false;
+  }
+
+  updateRecovery(delta: number): boolean {
+    if (!this.destroyed) return false;
+    this.recoveryTimer -= delta;
+    if (this.recoveryTimer > 0) return false;
+    this.destroyed = false;
+    this.recoveryTimer = 0;
+    this.group.visible = true;
+    this.speed = 0;
+    this.lateralVelocity = 0;
+    this.steering = 0;
+    this.placeAt(this.recoveryProgress, this.recoveryLateral);
+    this.updateTrackQuery();
+    return true;
   }
 
   updateTrackQuery(): void {
@@ -108,6 +149,8 @@ export class Kart {
       lap: this.lap,
       isOffRoad: this.isOffRoad,
       isDrifting: this.isDrifting,
+      lateralVelocity: this.lateralVelocity,
+      destroyed: this.destroyed,
       finished: this.finished,
     };
   }
@@ -125,21 +168,21 @@ export class Kart {
     const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x243b42, roughness: 0.75, flatShading: true });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: COLORS.yellow, roughness: 0.65, flatShading: true });
 
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.42, 2.35), bodyMaterial);
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.42, 2.2), bodyMaterial);
     chassis.position.y = 0.42;
     chassis.castShadow = true;
     this.group.add(chassis);
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.8, 1.05, 4), bodyMaterial);
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.74, 0.96, 4), bodyMaterial);
     nose.rotation.x = Math.PI / 2;
-    nose.position.set(0, 0.46, -1.3);
+    nose.position.set(0, 0.46, -1.2);
     nose.scale.set(1, 0.46, 1);
     nose.castShadow = true;
     this.group.add(nose);
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.52, 0.75), darkMaterial);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.52, 0.72), darkMaterial);
     seat.position.set(0, 0.76, 0.28);
     seat.castShadow = true;
     this.group.add(seat);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.13, 0.11), accentMaterial);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.13, 0.11), accentMaterial);
     back.position.set(0, 1.04, 0.73);
     this.group.add(back);
 
@@ -151,7 +194,7 @@ export class Kart {
     const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x26383d, roughness: 1, flatShading: true });
     this.frontWheelGroup.position.y = 0.27;
     this.group.add(this.frontWheelGroup);
-    for (const x of [-0.92, 0.92]) {
+    for (const x of [-0.82, 0.82]) {
       const front = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.18, 8), wheelMaterial);
       front.rotation.z = Math.PI / 2;
       front.position.set(x, 0, -0.75);
@@ -169,7 +212,7 @@ export class Kart {
     const lightMaterial = new THREE.MeshStandardMaterial({ color: 0xfff1ac, emissive: 0x8b671e, emissiveIntensity: 0.4 });
     for (const x of [-0.48, 0.48]) {
       const light = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 4), lightMaterial);
-      light.position.set(x, 0.58, -1.77);
+      light.position.set(x, 0.58, -1.65);
       this.group.add(light);
     }
   }

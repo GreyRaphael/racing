@@ -42,7 +42,7 @@ export class RaceSystem {
   ) {}
 
   get karts(): Kart[] {
-    return [this.player, ...this.ai];
+    return this.mode === 'race' ? [this.player, ...this.ai] : [this.player];
   }
 
   begin(mode: RaceMode): void {
@@ -53,6 +53,10 @@ export class RaceSystem {
     this.lapElapsedTime = 0;
     this.lapTimes.length = 0;
     this.result = null;
+    this.ai.forEach((kart) => {
+      kart.resetRaceState();
+      kart.group.visible = mode === 'race';
+    });
     const grid = [0, -2.2, 2.2, -4.35];
     this.karts.forEach((kart, index) => {
       kart.resetRaceState();

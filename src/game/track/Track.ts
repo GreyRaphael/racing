@@ -203,7 +203,7 @@ export class Track {
     const railMaterial = new THREE.MeshStandardMaterial({ color: COLORS.fence, roughness: 0.66 });
     const postMaterial = new THREE.MeshStandardMaterial({ color: COLORS.red, roughness: 0.72 });
     const capMaterial = new THREE.MeshStandardMaterial({ color: COLORS.yellow, roughness: 0.72 });
-    const railOffset = this.roadHalfWidth + 1.22;
+    const railOffset = this.fenceLimit;
     // Connect every post to the next post. The old 15/5 step mismatch left two thirds
     // of every rail side open, especially noticeable on the long bends.
     const railStep = 6;

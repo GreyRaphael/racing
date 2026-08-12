@@ -2,8 +2,11 @@ import * as THREE from 'three';
 
 export const TOTAL_LAPS = 3;
 export const TRACK_SAMPLE_COUNT = 420;
-export const ROAD_HALF_WIDTH = 4.6;
-export const GRASS_FENCE_LIMIT = 7.25;
+// The road has enough room for two karts to pass without making the scenery feel empty.
+export const ROAD_HALF_WIDTH = 5.2;
+// The collision wall is aligned with the visible guard-rail center.
+export const GRASS_FENCE_LIMIT = 6.4;
+export const KART_COLLISION_DISTANCE = 1.6;
 export const TRACK_LENGTH = 0;
 export const COLORS = {
   sky: 0x9bdcf5,

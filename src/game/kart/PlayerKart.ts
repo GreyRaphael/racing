@@ -1,4 +1,4 @@
-import { clamp } from '../constants';
+import { clamp, damp } from '../constants';
 import { Track } from '../track/Track';
 import { InputState } from '../systems/InputSystem';
 import { Kart } from './Kart';
@@ -28,16 +28,16 @@ export class PlayerKart extends Kart {
       else this.speed -= 8 * delta;
     }
 
-    const resistance = this.isOffRoad ? 5.4 : this.isDrifting ? 1.15 : 2.1;
+    const resistance = this.isDrifting ? 0.55 : 2.1;
+    const driftTarget = this.isDrifting ? steerInput * Math.max(2, Math.abs(this.speed) * 0.42) : 0;
+    this.lateralVelocity = damp(this.lateralVelocity, driftTarget, this.isDrifting ? 4 : 11, delta);
     if (!input.throttle && !input.brake) {
       this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), resistance * delta);
     } else {
       this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), resistance * delta * 0.25);
     }
-    const maxSpeed = this.isOffRoad ? 11 : 25;
-    this.speed = clamp(this.speed, -8, maxSpeed);
+    this.speed = clamp(this.speed, -8, 25);
     this.integrate(delta);
     this.updateTrackQuery();
-    if (this.isOffRoad) this.speed = clamp(this.speed, -7, 11);
   }
 }

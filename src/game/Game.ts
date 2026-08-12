@@ -58,7 +58,10 @@ export class Game {
     this.setupLighting();
     this.scene.add(this.environment.group, this.track.group, this.particles.group);
     this.scene.add(this.player.group);
-    for (const kart of this.ai) this.scene.add(kart.group);
+    for (const kart of this.ai) {
+      kart.group.visible = false;
+      this.scene.add(kart.group);
+    }
 
     this.race = new RaceSystem(this.track, this.player, this.ai, this.records);
     this.collision = new CollisionSystem(this.track);
@@ -95,6 +98,7 @@ export class Game {
     this.results.hide();
     this.hud.hide();
     this.menu.show();
+    for (const kart of this.ai) kart.group.visible = false;
     this.player.resetRaceState();
     this.player.placeAt(0.002, 0);
   }
@@ -108,7 +112,7 @@ export class Game {
 
   private step(delta: number): void {
     const canDrive = this.race.isDrivingAllowed();
-    const allKarts = [this.player, ...this.ai];
+    const allKarts = this.race.karts;
     for (const kart of allKarts) kart.collisionCooldown = Math.max(0, kart.collisionCooldown - delta);
     const resetPressed = this.input.consumeReset();
     if (resetPressed && this.race.phase !== 'menu') {
@@ -119,15 +123,30 @@ export class Game {
     if (this.race.phase !== 'menu' && this.race.phase !== 'results') {
       this.player.update(delta, this.input.state, canDrive);
       const playerRaceProgress = this.player.lap - 1 + this.player.progress;
-      for (const kart of this.ai) kart.update(delta, canDrive, playerRaceProgress);
-      const collisions = this.collision.resolve(allKarts);
-      for (const [kart, result] of collisions) {
-        if ((result.fenceHit || result.vehicleHit) && kart.collisionCooldown <= 0) {
+      if (this.race.mode === 'race') {
+        for (const kart of this.ai) kart.update(delta, canDrive, playerRaceProgress);
+      }
+      const collisionResolution = this.collision.resolve(allKarts);
+      for (const [kart, result] of collisionResolution.results) {
+        if (result.fenceHit && kart.collisionCooldown <= 0) {
           kart.collisionCooldown = 0.18;
           this.audio.collision();
           this.particles.burst(kart.position);
         } else if (result.grassEntered) {
           this.audio.grass();
+        }
+      }
+      for (const collision of collisionResolution.vehicleCollisions) {
+        // Only an opponent in front is removed. The rear kart keeps its speed,
+        // steering and drift state instead of exchanging velocities and sticking.
+        if (collision.front !== this.player && !collision.front.destroyed) {
+          collision.front.destroyFor(3);
+          this.audio.collision();
+          this.particles.burst(collision.front.position);
+        } else if (this.player.collisionCooldown <= 0) {
+          this.player.collisionCooldown = 0.18;
+          this.audio.collision();
+          this.particles.burst(this.player.position);
         }
       }
       if (this.player.isDrifting && canDrive) this.audio.drift();
@@ -182,7 +201,7 @@ export class Game {
       getState: () => ({
         ...this.race.getDebugState(),
         player: this.player.getDebugState(),
-        karts: [this.player, ...this.ai].map((kart) => kart.getDebugState()),
+        karts: this.race.karts.map((kart) => kart.getDebugState()),
         input: { ...this.input.state },
         storage: this.records.load(),
       }),

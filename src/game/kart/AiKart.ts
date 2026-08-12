@@ -15,6 +15,10 @@ export class AiKart extends Kart {
   }
 
   update(delta: number, canDrive: boolean, playerProgress: number): void {
+    if (this.destroyed) {
+      this.updateRecovery(delta);
+      return;
+    }
     if (!canDrive || this.finished) {
       this.steering = 0;
       this.speed = Math.max(0, this.speed - delta * 3);
@@ -38,10 +42,9 @@ export class AiKart extends Kart {
     const targetSpeed = clamp(this.profile.speed - curveTightness * 29, 8, this.profile.speed);
     if (this.speed < targetSpeed) this.speed += 15 * delta;
     else this.speed -= 20 * delta;
-    if (this.isOffRoad) this.speed -= 5 * delta;
     const rubberBand = clamp(playerProgress - (this.lap - 1 + this.progress), -0.7, 0.7);
     this.speed += rubberBand * 1.5 * delta;
-    this.speed = clamp(this.speed, 0, this.isOffRoad ? 10 : this.profile.speed + 2);
+    this.speed = clamp(this.speed, 0, this.profile.speed + 2);
     this.isDrifting = Math.abs(this.steering) > 0.72 && this.speed > 12;
     this.integrate(delta);
     this.updateTrackQuery();

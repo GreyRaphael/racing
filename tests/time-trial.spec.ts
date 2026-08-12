@@ -6,6 +6,7 @@ test('计时赛倒计时、结算与持久化', async ({ page }) => {
   await expect(page.getByTestId('race-hud')).toBeVisible();
   await expect(page.getByTestId('countdown')).toBeVisible();
   const before = await debugState(page);
+  expect((before.karts as unknown[]).length).toBe(1);
   await page.keyboard.down('w');
   await debugAdvance(page, 1);
   const locked = await debugState(page);
