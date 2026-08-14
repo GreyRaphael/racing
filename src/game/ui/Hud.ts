@@ -50,7 +50,7 @@ export class Hud {
     this.countdown.classList.toggle('hidden', !isCountdown);
     this.countdown.textContent = isCountdown ? String(race.countdownNumber) : '';
     if (race.mode === 'race') {
-      this.position.textContent = `${race.playerPosition} <small>/ ${race.karts.length}</small>`;
+      this.position.innerHTML = `${race.playerPosition} <small>/ ${race.karts.length}</small>`;
       const leader = race.getRanking()[0];
       this.leaderName.textContent = `领先：${leader?.name ?? '你'}`;
     }

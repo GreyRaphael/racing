@@ -41,6 +41,7 @@ export class Game {
   private activeMode: RaceMode = 'time-trial';
   private animationFrame = 0;
   private lastPhase = 'menu';
+  private lastCountdownNumber = 0;
   private started = false;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -86,6 +87,7 @@ export class Game {
     this.audio.initialize();
     this.audio.resume();
     this.race.begin(mode);
+    this.lastCountdownNumber = 0;
     this.menu.hide();
     this.results.hide();
     this.hud.show(mode);
@@ -160,6 +162,7 @@ export class Game {
       }
       if (this.player.isDrifting && canDrive) this.audio.drift();
       this.race.update(delta);
+      this.syncCountdownBeep();
       this.audio.update(this.player.speed, this.input.state.throttle);
       this.particles.update(delta, this.player);
       this.cameraSystem.update(delta, this.player);
@@ -177,9 +180,14 @@ export class Game {
       this.hud.hide();
       this.results.show(this.race.result, this.activeMode);
       this.audio.finish();
-    } else if (this.race.phase === 'racing') {
-      this.audio.countdown();
     }
+  }
+
+  private syncCountdownBeep(): void {
+    const number = this.race.phase === 'countdown' ? this.race.countdownNumber : 0;
+    if (number === this.lastCountdownNumber) return;
+    this.lastCountdownNumber = number;
+    if (number > 0) this.audio.countdown();
   }
 
   private setupLighting(): void {

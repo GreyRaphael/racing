@@ -80,7 +80,7 @@ export class Kart {
     const pose = this.track.getPose(progress, lateralOffset);
     this.position.copy(pose.position).setY(0.23);
     this.yaw = pose.yaw;
-    this.progress = pose.position ? progress : 0;
+    this.progress = progress;
     this.lateralOffset = lateralOffset;
     this.updateVisual(0);
   }
