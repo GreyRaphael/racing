@@ -32,6 +32,14 @@ export class AudioSystem {
     this.engineGain.gain.setTargetAtTime(0.012 + magnitude * 0.035, now, 0.08);
   }
 
+  stopEngine(): void {
+    if (!this.context || !this.engineGain) return;
+    const now = this.context.currentTime;
+    this.engineGain.gain.cancelScheduledValues(now);
+    this.engineGain.gain.setValueAtTime(this.engineGain.gain.value, now);
+    this.engineGain.gain.linearRampToValueAtTime(0, now + 0.05);
+  }
+
   countdown(): void { this.playThrottled('countdown', 440, 0.09, 0); }
   finish(): void { this.playThrottled('finish', 740, 0.18, 0); }
   collision(): void { this.playThrottled('collision', 115, 0.1, 0.12); }
@@ -39,6 +47,7 @@ export class AudioSystem {
   drift(): void { this.playThrottled('drift', 210, 0.045, 0.09); }
 
   dispose(): void {
+    this.stopEngine();
     this.engineOscillator?.stop();
     this.context?.close();
     this.engineOscillator = null;

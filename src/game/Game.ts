@@ -149,6 +149,7 @@ export class Game {
 
   private returnToMenu(): void {
     this.race.phase = 'menu';
+    this.audio.stopEngine();
     this.results.hide();
     this.hud.hide();
     this.menu.show();
@@ -230,6 +231,7 @@ export class Game {
   private handlePhaseChange(): void {
     if (this.race.phase === 'results' && this.race.result) {
       this.hud.hide();
+      this.audio.stopEngine();
       this.results.show(this.race.result, this.activeMode, TRACK_CONFIGS[this.activeTrackId]);
       this.audio.finish();
     }
