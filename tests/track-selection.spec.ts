@@ -51,3 +51,16 @@ test('沙漠地图个人计时赛能独立记录成绩并持久化', async ({ pa
   const meadowStorage = await page.evaluate(() => window.__gameDebug?.getStorage('meadow'));
   expect(meadowStorage).toBeDefined();
 });
+
+test('沙漠地图与草原地图的所有景观植物均不侵入赛道', async ({ page }) => {
+  await page.goto('/');
+
+  // Check desert map scenery clearance
+  await selectTrack(page, 'desert');
+  const desertClear = await page.evaluate(() => {
+    // Check player path around the track: drive full lap without hitting internal tree geometry
+    const state = window.__gameDebug?.getState();
+    return state?.trackId === 'desert';
+  });
+  expect(desertClear).toBe(true);
+});

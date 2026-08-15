@@ -48,14 +48,24 @@ export class Environment {
     this.group.add(patches);
   }
 
+  private isClearOfTrack(position: THREE.Vector3, minClearance = 8.5): boolean {
+    const query = this.track.getNearest(position);
+    return query.distanceToCenter >= minClearance && Math.abs(query.lateralOffset) >= minClearance;
+  }
+
   // --- Meadow Theme Props ---
   private buildMeadowScenery(): void {
     const scenery = new THREE.Group();
-    for (let i = 0; i < 30; i += 1) {
-      const progress = (i * 0.137 + 0.03) % 1;
+    for (let i = 0; i < 34; i += 1) {
+      const progress = (i * 0.095 + 0.03) % 1;
       const side = i % 2 === 0 ? 1 : -1;
-      const offset = 10.5 + (i % 5) * 2.8;
-      const pose = this.track.getPose(progress, side * offset);
+      const offset = 9.8 + (i % 5) * 2.4;
+      let pose = this.track.getPose(progress, side * offset);
+      if (!this.isClearOfTrack(pose.position, 8.5)) {
+        pose = this.track.getPose(progress, -side * offset);
+      }
+      if (!this.isClearOfTrack(pose.position, 8.5)) continue;
+
       const choice = i % 5;
       if (choice <= 2) {
         scenery.add(this.createMeadowTree(pose.position, 0.8 + (i % 4) * 0.15));
@@ -69,7 +79,9 @@ export class Environment {
     for (let i = 0; i < 14; i += 1) {
       const angle = i * 2.17;
       const radius = 59 + (i % 3) * 3;
-      scenery.add(this.createMeadowTree(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius), 1.25));
+      const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 9.0)) continue;
+      scenery.add(this.createMeadowTree(pos, 1.25));
     }
     this.group.add(scenery);
   }
@@ -167,11 +179,16 @@ export class Environment {
     const scenery = new THREE.Group();
 
     // 1. Surrounding Cacti, Palms & Canyon Rocks along the track
-    for (let i = 0; i < 34; i += 1) {
-      const progress = (i * 0.119 + 0.04) % 1;
+    for (let i = 0; i < 40; i += 1) {
+      const progress = (i * 0.087 + 0.025) % 1;
       const side = i % 2 === 0 ? 1 : -1;
-      const offset = 10 + (i % 4) * 3.2;
-      const pose = this.track.getPose(progress, side * offset);
+      const offset = 9.6 + (i % 4) * 2.6;
+      let pose = this.track.getPose(progress, side * offset);
+      if (!this.isClearOfTrack(pose.position, 8.8)) {
+        pose = this.track.getPose(progress, -side * offset);
+      }
+      if (!this.isClearOfTrack(pose.position, 8.8)) continue;
+
       const type = i % 5;
       if (type === 0 || type === 2) {
         scenery.add(this.createCactus(pose.position, 0.85 + (i % 3) * 0.25, i));
@@ -184,16 +201,18 @@ export class Environment {
       }
     }
 
-    // 2. Oasis Area at inner curve
-    const oasisProgress = 0.46;
-    const oasisPose = this.track.getPose(oasisProgress, -16);
-    scenery.add(this.createOasis(oasisPose.position));
+    // 2. Oasis Area in wide open infield (safely cleared of all track segments)
+    const oasisCenter = new THREE.Vector3(-2, 0, -8);
+    if (this.isClearOfTrack(oasisCenter, 15)) {
+      scenery.add(this.createOasis(oasisCenter));
+    }
 
     // 3. Distant desert dunes and giant canyon rock formations
     for (let i = 0; i < 16; i += 1) {
       const angle = i * 2.05;
       const radius = 58 + (i % 4) * 4;
       const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 9.0)) continue;
       if (i % 2 === 0) {
         scenery.add(this.createCanyonRock(pos, 1.8 + (i % 3) * 0.6));
       } else {
@@ -316,7 +335,7 @@ export class Environment {
 
     // Water pool
     const water = new THREE.Mesh(
-      new THREE.CircleGeometry(6.5, 12),
+      new THREE.CircleGeometry(5.5, 16),
       new THREE.MeshStandardMaterial({
         color: COLORS.oasisWater,
         roughness: 0.12,
@@ -332,8 +351,11 @@ export class Environment {
     // Palm cluster around oasis
     for (let i = 0; i < 4; i += 1) {
       const angle = (i * Math.PI) / 2 + 0.3;
-      const palmPos = new THREE.Vector3(Math.cos(angle) * 7.2, 0, Math.sin(angle) * 7.2);
-      oasis.add(this.createDesertPalm(palmPos, 1.1 + (i % 2) * 0.25));
+      const palmLocal = new THREE.Vector3(Math.cos(angle) * 5.5, 0, Math.sin(angle) * 5.5);
+      const palmWorld = position.clone().add(palmLocal);
+      if (this.isClearOfTrack(palmWorld, 8.5)) {
+        oasis.add(this.createDesertPalm(palmLocal, 1.0 + (i % 2) * 0.2));
+      }
     }
     return oasis;
   }
