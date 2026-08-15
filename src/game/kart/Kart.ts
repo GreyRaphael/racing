@@ -42,11 +42,15 @@ export class Kart {
   private readonly wheelMeshes: THREE.Mesh[] = [];
   private readonly frontWheelGroup = new THREE.Group();
 
-  constructor(name: string, color: number, protected readonly track: Track) {
+  constructor(name: string, color: number, protected track: Track) {
     this.name = name;
     this.color = color;
     this.buildVisual();
     this.group.castShadow = true;
+  }
+
+  setTrack(track: Track): void {
+    this.track = track;
   }
 
   getForward(): THREE.Vector3 {

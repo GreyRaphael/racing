@@ -7,14 +7,28 @@
     <title>阳光草原卡丁车</title>
   </head>
   <body>
-    <main id="app" aria-label="阳光草原卡丁车赛车游戏">
+    <main id="app" aria-label="极速卡丁车赛车游戏">
       <canvas id="game-canvas" aria-label="3D 赛车场景"></canvas>
 
       <section id="menu-screen" class="screen-layer" aria-label="主菜单">
         <div class="menu-card">
-          <p class="eyebrow">SUNNY MEADOW CIRCUIT</p>
-          <h1>阳光草原<br /><span>卡丁车</span></h1>
-          <p class="subtitle">在微风、花朵和急弯之间，跑出你的最佳圈速。</p>
+          <p class="eyebrow" id="menu-eyebrow">SUNNY MEADOW CIRCUIT</p>
+          <h1 id="menu-title">极速<br /><span id="menu-track-name">阳光草原</span></h1>
+          <p class="subtitle" id="menu-subtitle">在微风、花朵和急弯之间，跑出你的最佳圈速。</p>
+          
+          <div class="menu-section-label">赛道地图</div>
+          <div id="track-menu" data-testid="track-menu" class="track-menu" role="group" aria-label="选择赛道地图">
+            <button id="track-meadow" data-testid="track-meadow" class="track-button selected" type="button" aria-pressed="true">
+              <span class="track-icon">🌿</span>
+              <span><strong>阳光草原</strong><small>微风与花朵起伏弯道</small></span>
+            </button>
+            <button id="track-desert" data-testid="track-desert" class="track-button" type="button" aria-pressed="false">
+              <span class="track-icon">🏜️</span>
+              <span><strong>黄金沙漠</strong><small>沙丘、仙人掌与绿洲急弯</small></span>
+            </button>
+          </div>
+
+          <div class="menu-section-label">比赛模式</div>
           <div id="mode-menu" data-testid="mode-menu" class="mode-menu" role="group" aria-label="选择比赛模式">
             <button id="time-trial-mode" data-testid="time-trial-mode" class="mode-button selected" type="button" aria-pressed="true">
               <span class="mode-icon">◷</span>
@@ -33,7 +47,7 @@
 
       <section id="race-hud" data-testid="race-hud" class="hud-layer hidden" aria-label="比赛信息">
         <div class="hud-topline">
-          <div class="brand-mark">SMC <span>•</span> 01</div>
+          <div id="brand-mark" class="brand-mark">SMC <span>•</span> 01</div>
           <div id="mode-label" data-testid="mode-label">个人计时赛</div>
           <div class="hud-status"><span class="status-dot"></span><span id="speed-value">0</span> KM/H</div>
         </div>

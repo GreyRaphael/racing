@@ -9,12 +9,45 @@ export const GRASS_FENCE_LIMIT = 6.4;
 export const KART_COLLISION_DISTANCE = 1.6;
 export const COLLISION_RESTITUTION = 0.48;
 export const DESTROY_CLOSING_SPEED = 4.5;
+export type TrackId = 'meadow' | 'desert';
+
+export interface TrackTheme {
+  sky: number;
+  fog: number;
+  fogNear: number;
+  fogFar: number;
+  hemisphereSky: number;
+  hemisphereGround: number;
+  hemisphereIntensity: number;
+  sunlightColor: number;
+  sunlightIntensity: number;
+  sunlightPos: [number, number, number];
+  ground: number;
+  groundPatches: number;
+  road: number;
+  roadEdge: number;
+  fence: number;
+  fencePost: number;
+  fenceCap: number;
+  marker: number;
+  dustColor: number;
+}
+
+export interface TrackConfig {
+  id: TrackId;
+  name: string;
+  shortCode: string;
+  subtitle: string;
+  controls: THREE.Vector3[];
+  theme: TrackTheme;
+}
+
 export const COLORS = {
   sky: 0x9bdcf5,
   grass: 0x76b85e,
   grassLight: 0x8ccf6b,
-  road: 0x66717a,
-  roadEdge: 0xe8e6d2,
+  road: 0x53656b,
+  roadEdge: 0xf1e8c9,
   fence: 0xf4f1dc,
   red: 0xf15a4a,
   yellow: 0xffce58,
@@ -27,6 +60,106 @@ export const COLORS = {
   flowerPink: 0xf38ab4,
   flowerYellow: 0xffd15c,
   flowerWhite: 0xf6f2da,
+  // Desert theme colors
+  desertSky: 0xfebf88,
+  desertFog: 0xfebf88,
+  sand: 0xd9a860,
+  sandPatches: 0xc28f46,
+  desertRoad: 0x564942,
+  desertRoadEdge: 0xe8d29b,
+  desertFence: 0xdc9766,
+  desertPost: 0xa84828,
+  desertCap: 0xf9a838,
+  cactus: 0x487e42,
+  cactusDark: 0x376433,
+  palmTrunk: 0x78553d,
+  palmLeaf: 0x549442,
+  palmLeafLight: 0x74b85d,
+  canyonRock: 0xc57646,
+  canyonRockDark: 0x9e522d,
+  oasisWater: 0x40a8c4,
+  sandDust: 0xe2a85e,
+};
+
+export const TRACK_CONFIGS: Record<TrackId, TrackConfig> = {
+  meadow: {
+    id: 'meadow',
+    name: '阳光草原',
+    shortCode: 'SMC • 01',
+    subtitle: '微风、花朵与起伏弯道',
+    controls: [
+      new THREE.Vector3(-24, 0, -34),
+      new THREE.Vector3(11, 0, -37),
+      new THREE.Vector3(35, 0, -22),
+      new THREE.Vector3(34, 0, 7),
+      new THREE.Vector3(17, 0, 23),
+      new THREE.Vector3(26, 0, 43),
+      new THREE.Vector3(-8, 0, 47),
+      new THREE.Vector3(-35, 0, 32),
+      new THREE.Vector3(-44, 0, 5),
+      new THREE.Vector3(-34, 0, -21),
+    ],
+    theme: {
+      sky: COLORS.sky,
+      fog: COLORS.sky,
+      fogNear: 85,
+      fogFar: 170,
+      hemisphereSky: 0xe4f7ff,
+      hemisphereGround: 0x6d9a55,
+      hemisphereIntensity: 2.2,
+      sunlightColor: 0xfff4cf,
+      sunlightIntensity: 3.8,
+      sunlightPos: [-35, 62, -28],
+      ground: COLORS.grass,
+      groundPatches: COLORS.grassLight,
+      road: 0x53656b,
+      roadEdge: 0xf1e8c9,
+      fence: COLORS.fence,
+      fencePost: COLORS.red,
+      fenceCap: COLORS.yellow,
+      marker: 0xf8f3d8,
+      dustColor: 0xd8c49a,
+    },
+  },
+  desert: {
+    id: 'desert',
+    name: '黄金沙漠',
+    shortCode: 'GDC • 02',
+    subtitle: '沙丘、仙人掌与绿洲急弯',
+    controls: [
+      new THREE.Vector3(-28, 0, -38),
+      new THREE.Vector3(14, 0, -42),
+      new THREE.Vector3(38, 0, -25),
+      new THREE.Vector3(38, 0, 8),
+      new THREE.Vector3(15, 0, 20),
+      new THREE.Vector3(30, 0, 42),
+      new THREE.Vector3(-10, 0, 48),
+      new THREE.Vector3(-38, 0, 34),
+      new THREE.Vector3(-46, 0, 8),
+      new THREE.Vector3(-38, 0, -22),
+    ],
+    theme: {
+      sky: COLORS.desertSky,
+      fog: COLORS.desertFog,
+      fogNear: 80,
+      fogFar: 165,
+      hemisphereSky: 0xffeedb,
+      hemisphereGround: 0xa0673b,
+      hemisphereIntensity: 2.4,
+      sunlightColor: 0xffeed0,
+      sunlightIntensity: 4.0,
+      sunlightPos: [-40, 58, -30],
+      ground: COLORS.sand,
+      groundPatches: COLORS.sandPatches,
+      road: COLORS.desertRoad,
+      roadEdge: COLORS.desertRoadEdge,
+      fence: COLORS.desertFence,
+      fencePost: COLORS.desertPost,
+      fenceCap: COLORS.desertCap,
+      marker: 0xf7e9b8,
+      dustColor: COLORS.sandDust,
+    },
+  },
 };
 
 export const UP = new THREE.Vector3(0, 1, 0);

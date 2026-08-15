@@ -11,4 +11,13 @@ export default defineConfig({
     port: 4173,
     strictPort: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+        },
+      },
+    },
+  },
 });

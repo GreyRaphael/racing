@@ -1,9 +1,20 @@
 import { Page } from '@playwright/test';
 
-export async function startMode(page: Page, mode: 'time-trial' | 'race' = 'time-trial'): Promise<void> {
+export async function startMode(
+  page: Page,
+  mode: 'time-trial' | 'race' = 'time-trial',
+  track: 'meadow' | 'desert' = 'meadow',
+): Promise<void> {
   await page.goto('/');
+  if (track === 'desert') await page.getByTestId('track-desert').click();
+  else await page.getByTestId('track-meadow').click();
   if (mode === 'race') await page.getByTestId('race-mode').click();
   await page.getByTestId('start-race').click();
+}
+
+export async function selectTrack(page: Page, track: 'meadow' | 'desert'): Promise<void> {
+  if (track === 'desert') await page.getByTestId('track-desert').click();
+  else await page.getByTestId('track-meadow').click();
 }
 
 export async function debugState(page: Page): Promise<Record<string, unknown>> {

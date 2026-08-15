@@ -26,7 +26,11 @@ export interface CollisionResolution {
 }
 
 export class CollisionSystem {
-  constructor(private readonly track: Track) {}
+  constructor(private track: Track) {}
+
+  setTrack(track: Track): void {
+    this.track = track;
+  }
 
   resolve(karts: Kart[]): CollisionResolution {
     const results = new Map<Kart, CollisionResult>();

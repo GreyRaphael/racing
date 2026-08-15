@@ -1,4 +1,4 @@
-import { formatTime } from '../constants';
+import { TRACK_CONFIGS, TrackConfig, formatTime } from '../constants';
 import { RaceResult, RaceMode } from '../systems/RaceSystem';
 
 export class Results {
@@ -14,10 +14,10 @@ export class Results {
     this.require<HTMLButtonElement>('#back-to-menu').addEventListener('click', onMenu);
   }
 
-  show(result: RaceResult, mode: RaceMode): void {
+  show(result: RaceResult, mode: RaceMode, trackConfig: TrackConfig = TRACK_CONFIGS.meadow): void {
     this.root.classList.remove('hidden');
     this.title.textContent = mode === 'race' ? this.getRaceTitle(result) : '漂亮完赛！';
-    this.caption.textContent = mode === 'race' ? '本场比赛最终排名' : '你的草原圈速记录';
+    this.caption.textContent = mode === 'race' ? `${trackConfig.name}最终排名` : `${trackConfig.name}圈速记录`;
     this.total.textContent = formatTime(result.totalTime);
     const laps = result.lapTimes.length > 0 ? result.lapTimes : [result.totalTime];
     this.bestLap.textContent = formatTime(Math.min(...laps));

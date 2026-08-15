@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COLORS, DESTROY_CLOSING_SPEED } from './constants';
+import { COLORS, DESTROY_CLOSING_SPEED, TRACK_CONFIGS, TrackConfig, TrackId } from './constants';
 import { Environment } from './track/Environment';
 import { Track } from './track/Track';
 import { AiKart } from './kart/AiKart';
@@ -19,8 +19,8 @@ export class Game {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(61, window.innerWidth / window.innerHeight, 0.1, 300);
   readonly renderer: THREE.WebGLRenderer;
-  readonly track = new Track();
-  readonly environment = new Environment(this.track);
+  track = new Track(TRACK_CONFIGS.meadow);
+  environment = new Environment(this.track);
   readonly input = new InputSystem();
   readonly records = new TimeTrialRecords();
   readonly audio = new AudioSystem();
@@ -38,11 +38,15 @@ export class Game {
   readonly hud: Hud;
   readonly results: Results;
   private readonly clock = new THREE.Clock();
+  private hemisphereLight!: THREE.HemisphereLight;
+  private sunlight!: THREE.DirectionalLight;
   private activeMode: RaceMode = 'time-trial';
+  private activeTrackId: TrackId = 'meadow';
   private animationFrame = 0;
   private lastPhase = 'menu';
   private lastCountdownNumber = 0;
   private started = false;
+  private readonly onResize = (): void => this.resize();
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -64,13 +68,17 @@ export class Game {
       this.scene.add(kart.group);
     }
 
-    this.race = new RaceSystem(this.track, this.player, this.ai, this.records);
+    this.race = new RaceSystem(this.track, this.player, this.ai, this.records, this.activeTrackId);
     this.collision = new CollisionSystem(this.track);
     this.cameraSystem = new CameraSystem(this.camera);
-    this.menu = new Menu(this.records, (mode) => this.startRace(mode));
+    this.menu = new Menu(
+      this.records,
+      (mode) => this.startRace(mode),
+      (trackId) => this.setTrack(trackId),
+    );
     this.hud = new Hud(this.records);
     this.results = new Results(() => this.startRace(this.activeMode), () => this.returnToMenu());
-    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('resize', this.onResize);
     this.installDebugInterface();
   }
 
@@ -82,6 +90,50 @@ export class Game {
     this.loop();
   }
 
+  setTrack(trackId: TrackId): void {
+    if (this.activeTrackId === trackId && this.started) return;
+    this.activeTrackId = trackId;
+    const config: TrackConfig = TRACK_CONFIGS[trackId];
+
+    // Remove old geometry
+    this.scene.remove(this.track.group, this.environment.group);
+    this.track.dispose();
+    this.environment.dispose();
+
+    // Create new track & scenery
+    this.track = new Track(config);
+    this.environment = new Environment(this.track);
+    this.scene.add(this.environment.group, this.track.group);
+
+    // Apply atmospheric theme
+    const theme = config.theme;
+    (this.scene.background as THREE.Color).set(theme.sky);
+    if (this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.color.set(theme.fog);
+      this.scene.fog.near = theme.fogNear;
+      this.scene.fog.far = theme.fogFar;
+    }
+    this.hemisphereLight.color.set(theme.hemisphereSky);
+    this.hemisphereLight.groundColor.set(theme.hemisphereGround);
+    this.hemisphereLight.intensity = theme.hemisphereIntensity;
+    this.sunlight.color.set(theme.sunlightColor);
+    this.sunlight.intensity = theme.sunlightIntensity;
+    this.sunlight.position.set(...theme.sunlightPos);
+    this.particles.setDustColor(theme.dustColor);
+
+    // Re-bind systems
+    this.player.setTrack(this.track);
+    for (const kart of this.ai) kart.setTrack(this.track);
+    this.collision.setTrack(this.track);
+    this.race.setTrack(this.track, trackId);
+
+    // Reset player position on new track
+    this.player.resetRaceState();
+    this.player.placeAt(0.002, 0);
+    this.cameraSystem.update(1 / 60, this.player);
+    this.hud.refreshRecord(trackId);
+  }
+
   private startRace(mode: RaceMode): void {
     this.activeMode = mode;
     this.audio.initialize();
@@ -90,7 +142,7 @@ export class Game {
     this.lastCountdownNumber = 0;
     this.menu.hide();
     this.results.hide();
-    this.hud.show(mode);
+    this.hud.show(mode, TRACK_CONFIGS[this.activeTrackId]);
     this.lastPhase = this.race.phase;
     this.hud.update(this.race, this.player);
   }
@@ -178,7 +230,7 @@ export class Game {
   private handlePhaseChange(): void {
     if (this.race.phase === 'results' && this.race.result) {
       this.hud.hide();
-      this.results.show(this.race.result, this.activeMode);
+      this.results.show(this.race.result, this.activeMode, TRACK_CONFIGS[this.activeTrackId]);
       this.audio.finish();
     }
   }
@@ -191,19 +243,19 @@ export class Game {
   }
 
   private setupLighting(): void {
-    const hemisphere = new THREE.HemisphereLight(0xe4f7ff, 0x6d9a55, 2.2);
-    this.scene.add(hemisphere);
-    const sunlight = new THREE.DirectionalLight(0xfff4cf, 3.8);
-    sunlight.position.set(-35, 62, -28);
-    sunlight.castShadow = true;
-    sunlight.shadow.mapSize.set(1536, 1536);
-    sunlight.shadow.camera.left = -70;
-    sunlight.shadow.camera.right = 70;
-    sunlight.shadow.camera.top = 70;
-    sunlight.shadow.camera.bottom = -70;
-    sunlight.shadow.camera.near = 1;
-    sunlight.shadow.camera.far = 180;
-    this.scene.add(sunlight);
+    this.hemisphereLight = new THREE.HemisphereLight(0xe4f7ff, 0x6d9a55, 2.2);
+    this.scene.add(this.hemisphereLight);
+    this.sunlight = new THREE.DirectionalLight(0xfff4cf, 3.8);
+    this.sunlight.position.set(-35, 62, -28);
+    this.sunlight.castShadow = true;
+    this.sunlight.shadow.mapSize.set(1536, 1536);
+    this.sunlight.shadow.camera.left = -70;
+    this.sunlight.shadow.camera.right = 70;
+    this.sunlight.shadow.camera.top = 70;
+    this.sunlight.shadow.camera.bottom = -70;
+    this.sunlight.shadow.camera.near = 1;
+    this.sunlight.shadow.camera.far = 180;
+    this.scene.add(this.sunlight);
   }
 
   private resize(): void {
@@ -217,10 +269,11 @@ export class Game {
     window.__gameDebug = {
       getState: () => ({
         ...this.race.getDebugState(),
+        trackId: this.activeTrackId,
         player: this.player.getDebugState(),
         karts: this.race.karts.map((kart) => kart.getDebugState()),
         input: { ...this.input.state },
-        storage: this.records.load(),
+        storage: this.records.load(this.activeTrackId),
       }),
       advance: (seconds: number) => {
         const safeSeconds = Math.max(0, Math.min(seconds, 120));
@@ -249,12 +302,17 @@ export class Game {
         return true;
       },
       resetPlayer: () => this.collision.reset(this.player),
-      getStorage: () => this.records.load(),
+      setTrack: (trackId: TrackId) => {
+        this.setTrack(trackId);
+        this.menu.selectTrack(trackId);
+        return true;
+      },
+      getStorage: (trackId: TrackId = this.activeTrackId) => this.records.load(trackId),
     };
   }
 
   private syncAfterDebugCommand(): void {
-    this.hud.refreshRecord();
+    this.hud.refreshRecord(this.activeTrackId);
     this.hud.update(this.race, this.player);
     if (this.race.phase !== this.lastPhase) {
       this.handlePhaseChange();
@@ -264,6 +322,11 @@ export class Game {
 
   dispose(): void {
     window.cancelAnimationFrame(this.animationFrame);
+    window.removeEventListener('resize', this.onResize);
+    this.input.dispose();
+    this.track.dispose();
+    this.environment.dispose();
+    this.particles.dispose();
     this.audio.dispose();
     this.renderer.dispose();
   }

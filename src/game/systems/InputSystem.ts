@@ -30,13 +30,22 @@ export class InputSystem {
     this.sync();
   };
 
+  private readonly onBlur = (): void => {
+    this.heldKeys.clear();
+    this.sync();
+  };
+
   constructor() {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
-    window.addEventListener('blur', () => {
-      this.heldKeys.clear();
-      this.sync();
-    });
+    window.addEventListener('blur', this.onBlur);
+  }
+
+  dispose(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
+    this.heldKeys.clear();
   }
 
   consumeReset(): boolean {

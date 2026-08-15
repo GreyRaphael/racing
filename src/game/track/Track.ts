@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COLORS, GRASS_FENCE_LIMIT, ROAD_HALF_WIDTH, TRACK_SAMPLE_COUNT, UP, wrapProgress } from '../constants';
+import { GRASS_FENCE_LIMIT, ROAD_HALF_WIDTH, TRACK_CONFIGS, TRACK_SAMPLE_COUNT, TrackConfig, UP, wrapProgress } from '../constants';
 
 export interface TrackSample {
   position: THREE.Vector3;
@@ -21,22 +21,12 @@ export class Track {
   readonly fenceLimit = GRASS_FENCE_LIMIT;
   readonly samples: TrackSample[] = [];
   readonly length: number;
+  readonly config: TrackConfig;
   private readonly curve: THREE.CatmullRomCurve3;
 
-  constructor() {
-    const controls = [
-      new THREE.Vector3(-24, 0, -34),
-      new THREE.Vector3(11, 0, -37),
-      new THREE.Vector3(35, 0, -22),
-      new THREE.Vector3(34, 0, 7),
-      new THREE.Vector3(17, 0, 23),
-      new THREE.Vector3(26, 0, 43),
-      new THREE.Vector3(-8, 0, 47),
-      new THREE.Vector3(-35, 0, 32),
-      new THREE.Vector3(-44, 0, 5),
-      new THREE.Vector3(-34, 0, -21),
-    ];
-    this.curve = new THREE.CatmullRomCurve3(controls, true, 'centripetal', 0.55);
+  constructor(config: TrackConfig = TRACK_CONFIGS.meadow) {
+    this.config = config;
+    this.curve = new THREE.CatmullRomCurve3(config.controls, true, 'centripetal', 0.55);
     this.sampleCurve();
     this.length = this.samples[this.samples.length - 1]?.distance ?? 0;
     this.buildRoad();
@@ -152,7 +142,7 @@ export class Track {
     roadGeometry.setIndex(roadIndices);
     roadGeometry.computeVertexNormals();
     const roadMaterial = new THREE.MeshStandardMaterial({
-      color: 0x53656b,
+      color: this.config.theme.road,
       roughness: 0.88,
       metalness: 0,
       side: THREE.DoubleSide,
@@ -167,7 +157,7 @@ export class Track {
     edgeGeometry.computeVertexNormals();
     const edge = new THREE.Mesh(
       edgeGeometry,
-      new THREE.MeshStandardMaterial({ color: 0xf1e8c9, roughness: 0.82, side: THREE.DoubleSide }),
+      new THREE.MeshStandardMaterial({ color: this.config.theme.roadEdge, roughness: 0.82, side: THREE.DoubleSide }),
     );
     edge.receiveShadow = true;
     this.group.add(edge);
@@ -177,7 +167,7 @@ export class Track {
   }
 
   private buildCenterMarkers(): void {
-    const markerMaterial = new THREE.MeshStandardMaterial({ color: 0xf8f3d8, roughness: 0.8 });
+    const markerMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.marker, roughness: 0.8 });
     for (let i = 8; i < this.samples.length; i += 18) {
       const sample = this.samples[i];
       const marker = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 1.5), markerMaterial);
@@ -191,7 +181,7 @@ export class Track {
     for (let i = -4; i < 4; i += 1) {
       const tile = new THREE.Mesh(
         new THREE.BoxGeometry(1.15, 0.035, 1.4),
-        new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xfaf7e9 : COLORS.red, roughness: 0.75 }),
+        new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xfaf7e9 : this.config.theme.fencePost, roughness: 0.75 }),
       );
       tile.position.copy(startSample.position).addScaledVector(startSample.lateral, i * 1.13).setY(0.09);
       tile.rotation.y = Math.atan2(startSample.tangent.x, startSample.tangent.z);
@@ -200,9 +190,9 @@ export class Track {
   }
 
   private buildGuardRails(): void {
-    const railMaterial = new THREE.MeshStandardMaterial({ color: COLORS.fence, roughness: 0.66 });
-    const postMaterial = new THREE.MeshStandardMaterial({ color: COLORS.red, roughness: 0.72 });
-    const capMaterial = new THREE.MeshStandardMaterial({ color: COLORS.yellow, roughness: 0.72 });
+    const railMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fence, roughness: 0.66 });
+    const postMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fencePost, roughness: 0.72 });
+    const capMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fenceCap, roughness: 0.72 });
     const railOffset = this.fenceLimit;
     // Connect every post to the next post. The old 15/5 step mismatch left two thirds
     // of every rail side open, especially noticeable on the long bends.
@@ -259,5 +249,16 @@ export class Track {
     caps.instanceMatrix.needsUpdate = true;
     upperRails.instanceMatrix.needsUpdate = true;
     lowerRails.instanceMatrix.needsUpdate = true;
+  }
+
+  dispose(): void {
+    this.group.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+        else child.material?.dispose();
+      }
+    });
+    this.group.clear();
   }
 }

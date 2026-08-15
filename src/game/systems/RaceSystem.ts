@@ -1,4 +1,4 @@
-import { TOTAL_LAPS, clamp, wrapProgress } from '../constants';
+import { TOTAL_LAPS, TrackId, clamp, wrapProgress } from '../constants';
 import { AiKart } from '../kart/AiKart';
 import { Kart } from '../kart/Kart';
 import { PlayerKart } from '../kart/PlayerKart';
@@ -30,16 +30,29 @@ export class RaceSystem {
   lapElapsedTime = 0;
   countdownTimer = 0;
   result: RaceResult | null = null;
+  private _trackId: TrackId = 'meadow';
   private readonly lastProgress = new Map<Kart, number>();
   private readonly hasLeftStart = new Map<Kart, boolean>();
   private readonly lapTimes: number[] = [];
 
   constructor(
-    private readonly track: Track,
+    private track: Track,
     readonly player: PlayerKart,
     readonly ai: AiKart[],
     private readonly records: TimeTrialRecords,
-  ) {}
+    trackId: TrackId = 'meadow',
+  ) {
+    this._trackId = trackId;
+  }
+
+  get trackId(): TrackId {
+    return this._trackId;
+  }
+
+  setTrack(track: Track, trackId: TrackId): void {
+    this.track = track;
+    this._trackId = trackId;
+  }
 
   get karts(): Kart[] {
     return this.mode === 'race' ? [this.player, ...this.ai] : [this.player];
@@ -108,7 +121,7 @@ export class RaceSystem {
   }
 
   get bestLapTime(): number | null {
-    return this.records.load().bestLapTime;
+    return this.records.load(this._trackId).bestLapTime;
   }
 
   getRanking(): RankingEntry[] {
@@ -142,6 +155,7 @@ export class RaceSystem {
     return {
       phase: this.phase,
       mode: this.mode,
+      trackId: this._trackId,
       countdown: this.phase === 'countdown' ? this.countdownNumber : 0,
       elapsedTime: this.elapsedTime,
       lapTime: this.lapElapsedTime,
@@ -185,7 +199,7 @@ export class RaceSystem {
     this.phase = 'results';
     const totalTime = Math.max(0, this.elapsedTime);
     const lapTimes = this.lapTimes.slice(0, this.totalLaps);
-    const record = this.mode === 'time-trial' ? this.records.saveResult(totalTime, lapTimes) : null;
+    const record = this.mode === 'time-trial' ? this.records.saveResult(totalTime, lapTimes, this._trackId) : null;
     this.result = { totalTime, lapTimes, ranking: this.getRanking(), record };
   }
 }

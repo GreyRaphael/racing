@@ -10,7 +10,8 @@ declare global {
       setPlayerLateral: (offset: number) => boolean;
       setPlayerProgress: (progress: number, lateralOffset?: number) => boolean;
       resetPlayer: () => void;
-      getStorage: () => unknown;
+      setTrack: (trackId: 'meadow' | 'desert') => boolean;
+      getStorage: (trackId?: 'meadow' | 'desert') => unknown;
     };
   }
 }

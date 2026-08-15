@@ -1,10 +1,11 @@
-import { formatTime } from '../constants';
+import { TRACK_CONFIGS, TrackConfig, TrackId, formatTime } from '../constants';
 import { PlayerKart } from '../kart/PlayerKart';
 import { RaceMode, RaceSystem } from '../systems/RaceSystem';
 import { TimeTrialRecords } from '../../storage/TimeTrialRecords';
 
 export class Hud {
   private readonly root = this.require<HTMLElement>('#race-hud');
+  private readonly brandMark = this.require<HTMLElement>('#brand-mark');
   private readonly modeLabel = this.require<HTMLElement>('#mode-label');
   private readonly lap = this.require<HTMLElement>('#lap-counter');
   private readonly lapTime = this.require<HTMLElement>('#lap-time');
@@ -17,14 +18,17 @@ export class Hud {
   private readonly leaderName = this.require<HTMLElement>('#leader-name');
   private readonly progressFill = this.require<HTMLElement>('#progress-fill');
   private readonly driftIndicator = this.require<HTMLElement>('#drift-indicator');
+  private activeTrackId: TrackId = 'meadow';
 
   constructor(private readonly records: TimeTrialRecords) {}
 
-  show(mode: RaceMode): void {
+  show(mode: RaceMode, trackConfig: TrackConfig = TRACK_CONFIGS.meadow): void {
+    this.activeTrackId = trackConfig.id;
     this.root.classList.remove('hidden');
-    this.modeLabel.textContent = mode === 'race' ? '多人比赛' : '个人计时赛';
+    this.brandMark.innerHTML = `${trackConfig.shortCode.split('•')[0].trim()} <span>•</span> ${trackConfig.shortCode.split('•')[1]?.trim() ?? '01'}`;
+    this.modeLabel.textContent = `${trackConfig.name} · ${mode === 'race' ? '多人比赛' : '个人计时赛'}`;
     this.positionCard.classList.toggle('hidden', mode !== 'race');
-    this.refreshRecord();
+    this.refreshRecord(trackConfig.id);
   }
 
   hide(): void { this.root.classList.add('hidden'); }
@@ -32,8 +36,9 @@ export class Hud {
   // Best-lap record only changes when finishRace saves a result, at which
   // point the HUD is hidden behind the results panel. Re-fetch on demand
   // instead of parsing localStorage on every animation frame.
-  refreshRecord(): void {
-    const record = this.records.load();
+  refreshRecord(trackId: TrackId = this.activeTrackId): void {
+    this.activeTrackId = trackId;
+    const record = this.records.load(trackId);
     this.bestLap.textContent = record.bestLapTime === null ? '最佳 —' : `最佳 ${formatTime(record.bestLapTime)}`;
   }
 
