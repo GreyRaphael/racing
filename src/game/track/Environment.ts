@@ -183,8 +183,8 @@ export class Environment {
     const scenery = new THREE.Group();
 
     // 1. Surrounding Cacti, Palms & Canyon Rocks along the track
-    for (let i = 0; i < 40; i += 1) {
-      const progress = (i * 0.087 + 0.025) % 1;
+    for (let i = 0; i < 48; i += 1) {
+      const progress = (i * 0.081 + 0.02) % 1;
       const side = i % 2 === 0 ? 1 : -1;
       const offset = 9.6 + (i % 4) * 2.6;
       let pose = this.track.getPose(progress, side * offset);
@@ -206,7 +206,7 @@ export class Environment {
     }
 
     // 2. Oasis Area in wide open infield (safely cleared of all track segments)
-    const oasisCenter = new THREE.Vector3(-2, 0, -8);
+    const oasisCenter = new THREE.Vector3(0, 0, -5);
     if (this.isClearOfTrack(oasisCenter, 15)) {
       scenery.add(this.createOasis(oasisCenter));
     }
