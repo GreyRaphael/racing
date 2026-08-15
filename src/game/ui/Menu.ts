@@ -24,8 +24,10 @@ export class Menu {
 
     const meadowBtn = this.require<HTMLButtonElement>('#track-meadow');
     const desertBtn = this.require<HTMLButtonElement>('#track-desert');
+    const snowBtn = this.require<HTMLButtonElement>('#track-snow');
     meadowBtn.addEventListener('click', () => this.selectTrack('meadow'));
     desertBtn.addEventListener('click', () => this.selectTrack('desert'));
+    snowBtn.addEventListener('click', () => this.selectTrack('snow'));
 
     this.startButton.addEventListener('click', () => onStart(this.mode));
     this.refreshRecord();
@@ -45,13 +47,22 @@ export class Menu {
     this.trackId = trackId;
     const meadowBtn = this.require<HTMLButtonElement>('#track-meadow');
     const desertBtn = this.require<HTMLButtonElement>('#track-desert');
+    const snowBtn = this.require<HTMLButtonElement>('#track-snow');
     meadowBtn.classList.toggle('selected', trackId === 'meadow');
     desertBtn.classList.toggle('selected', trackId === 'desert');
+    snowBtn.classList.toggle('selected', trackId === 'snow');
     meadowBtn.setAttribute('aria-pressed', String(trackId === 'meadow'));
     desertBtn.setAttribute('aria-pressed', String(trackId === 'desert'));
+    snowBtn.setAttribute('aria-pressed', String(trackId === 'snow'));
 
     const config = TRACK_CONFIGS[trackId];
-    this.eyebrow.textContent = trackId === 'desert' ? 'GOLDEN DUNES CIRCUIT' : 'SUNNY MEADOW CIRCUIT';
+    if (trackId === 'desert') {
+      this.eyebrow.textContent = 'GOLDEN DUNES CIRCUIT';
+    } else if (trackId === 'snow') {
+      this.eyebrow.textContent = 'FROST PEAK CIRCUIT';
+    } else {
+      this.eyebrow.textContent = 'SUNNY MEADOW CIRCUIT';
+    }
     this.trackName.textContent = config.name;
     this.subtitle.textContent = config.subtitle;
 

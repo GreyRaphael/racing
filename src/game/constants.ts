@@ -9,7 +9,7 @@ export const GRASS_FENCE_LIMIT = 6.4;
 export const KART_COLLISION_DISTANCE = 1.6;
 export const COLLISION_RESTITUTION = 0.48;
 export const DESTROY_CLOSING_SPEED = 4.5;
-export type TrackId = 'meadow' | 'desert';
+export type TrackId = 'meadow' | 'desert' | 'snow';
 
 export interface TrackTheme {
   sky: number;
@@ -79,6 +79,27 @@ export const COLORS = {
   canyonRockDark: 0x9e522d,
   oasisWater: 0x40a8c4,
   sandDust: 0xe2a85e,
+  // Snow theme colors
+  snowSky: 0x7cb8e2,
+  snowFog: 0x88c4e8,
+  snowGround: 0xe4eff7,
+  snowPatches: 0xc8e0f0,
+  snowRoad: 0x3e4f5c,
+  snowRoadEdge: 0xdaf0fc,
+  snowFence: 0xd8effa,
+  snowPost: 0x2a527a,
+  snowCap: 0x66c7f4,
+  snowPineTrunk: 0x4e3e36,
+  snowPineLeaf: 0x224939,
+  snowWhite: 0xf2f7fc,
+  iceCrystal: 0x5ebbe8,
+  iceCrystalLight: 0xa6e6fd,
+  snowRock: 0x697882,
+  snowLake: 0x72c8eb,
+  snowDust: 0xeaf5fc,
+  carrotOrange: 0xeb6728,
+  coalBlack: 0x242729,
+  scarfRed: 0xde3f3f,
 };
 
 export const TRACK_CONFIGS: Record<TrackId, TrackConfig> = {
@@ -158,6 +179,45 @@ export const TRACK_CONFIGS: Record<TrackId, TrackConfig> = {
       fenceCap: COLORS.desertCap,
       marker: 0xf7e9b8,
       dustColor: COLORS.sandDust,
+    },
+  },
+  snow: {
+    id: 'snow',
+    name: '冰封雪原',
+    shortCode: 'FPC • 03',
+    subtitle: '冰川、雪松与极地冰道',
+    controls: [
+      new THREE.Vector3(-34, 0, -36),
+      new THREE.Vector3(10, 0, -45),
+      new THREE.Vector3(36, 0, -30),
+      new THREE.Vector3(42, 0, -6),
+      new THREE.Vector3(20, 0, 16),
+      new THREE.Vector3(32, 0, 38),
+      new THREE.Vector3(-2, 0, 48),
+      new THREE.Vector3(-34, 0, 40),
+      new THREE.Vector3(-46, 0, 16),
+      new THREE.Vector3(-42, 0, -16),
+    ],
+    theme: {
+      sky: COLORS.snowSky,
+      fog: COLORS.snowFog,
+      fogNear: 85,
+      fogFar: 175,
+      hemisphereSky: 0xdcf0ff,
+      hemisphereGround: 0x789eb8,
+      hemisphereIntensity: 2.3,
+      sunlightColor: 0xf0f7ff,
+      sunlightIntensity: 3.8,
+      sunlightPos: [-30, 65, -30],
+      ground: COLORS.snowGround,
+      groundPatches: COLORS.snowPatches,
+      road: COLORS.snowRoad,
+      roadEdge: COLORS.snowRoadEdge,
+      fence: COLORS.snowFence,
+      fencePost: COLORS.snowPost,
+      fenceCap: COLORS.snowCap,
+      marker: 0xf0f8ff,
+      dustColor: COLORS.snowDust,
     },
   },
 };
