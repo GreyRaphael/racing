@@ -139,13 +139,19 @@ export class Track {
 
     const roadGeometry = new THREE.BufferGeometry();
     roadGeometry.setAttribute('position', new THREE.Float32BufferAttribute(roadPositions, 3));
+    const roadNormals = new Float32Array(roadPositions.length);
+    for (let i = 0; i < roadPositions.length; i += 3) {
+      roadNormals[i] = 0;
+      roadNormals[i + 1] = 1;
+      roadNormals[i + 2] = 0;
+    }
+    roadGeometry.setAttribute('normal', new THREE.BufferAttribute(roadNormals, 3));
     roadGeometry.setIndex(roadIndices);
-    roadGeometry.computeVertexNormals();
     const roadMaterial = new THREE.MeshStandardMaterial({
       color: this.config.theme.road,
       roughness: 0.88,
       metalness: 0,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     });
     const road = new THREE.Mesh(roadGeometry, roadMaterial);
     road.receiveShadow = true;
@@ -153,11 +159,17 @@ export class Track {
 
     const edgeGeometry = new THREE.BufferGeometry();
     edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
+    const edgeNormals = new Float32Array(edgePositions.length);
+    for (let i = 0; i < edgePositions.length; i += 3) {
+      edgeNormals[i] = 0;
+      edgeNormals[i + 1] = 1;
+      edgeNormals[i + 2] = 0;
+    }
+    edgeGeometry.setAttribute('normal', new THREE.BufferAttribute(edgeNormals, 3));
     edgeGeometry.setIndex(edgeIndices);
-    edgeGeometry.computeVertexNormals();
     const edge = new THREE.Mesh(
       edgeGeometry,
-      new THREE.MeshStandardMaterial({ color: this.config.theme.roadEdge, roughness: 0.82, side: THREE.DoubleSide }),
+      new THREE.MeshStandardMaterial({ color: this.config.theme.roadEdge, roughness: 0.82, side: THREE.FrontSide }),
     );
     edge.receiveShadow = true;
     this.group.add(edge);

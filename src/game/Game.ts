@@ -250,7 +250,9 @@ export class Game {
     this.sunlight = new THREE.DirectionalLight(0xfff4cf, 3.8);
     this.sunlight.position.set(-35, 62, -28);
     this.sunlight.castShadow = true;
-    this.sunlight.shadow.mapSize.set(1536, 1536);
+    this.sunlight.shadow.bias = -0.0003;
+    this.sunlight.shadow.normalBias = 0.02;
+    this.sunlight.shadow.mapSize.set(2048, 2048);
     this.sunlight.shadow.camera.left = -70;
     this.sunlight.shadow.camera.right = 70;
     this.sunlight.shadow.camera.top = 70;
