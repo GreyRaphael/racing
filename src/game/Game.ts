@@ -17,7 +17,7 @@ import { TimeTrialRecords } from '../storage/TimeTrialRecords';
 
 export class Game {
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(61, window.innerWidth / window.innerHeight, 0.1, 300);
+  readonly camera = new THREE.PerspectiveCamera(61, window.innerWidth / window.innerHeight, 0.25, 750);
   readonly renderer: THREE.WebGLRenderer;
   track = new Track(TRACK_CONFIGS.meadow);
   environment = new Environment(this.track);
@@ -58,8 +58,9 @@ export class Game {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
 
-    this.scene.background = new THREE.Color(COLORS.sky);
-    this.scene.fog = new THREE.Fog(COLORS.sky, 85, 170);
+    const initialTheme = TRACK_CONFIGS.meadow.theme;
+    this.scene.background = new THREE.Color(initialTheme.sky);
+    this.scene.fog = new THREE.Fog(initialTheme.fog, initialTheme.fogNear, initialTheme.fogFar);
     this.setupLighting();
     this.scene.add(this.environment.group, this.track.group, this.particles.group);
     this.scene.add(this.player.group);

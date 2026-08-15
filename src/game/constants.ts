@@ -13,6 +13,10 @@ export type TrackId = 'meadow' | 'desert' | 'snow';
 
 export interface TrackTheme {
   sky: number;
+  skyZenith: number;
+  skyHorizon: number;
+  mountainNear: number;
+  mountainFar: number;
   fog: number;
   fogNear: number;
   fogFar: number;
@@ -122,9 +126,13 @@ export const TRACK_CONFIGS: Record<TrackId, TrackConfig> = {
     ],
     theme: {
       sky: COLORS.sky,
-      fog: COLORS.sky,
-      fogNear: 85,
-      fogFar: 170,
+      skyZenith: 0x4aa8e8,
+      skyHorizon: 0xd4f0ff,
+      mountainNear: 0x529a4a,
+      mountainFar: 0x427672,
+      fog: 0xa8e0f6,
+      fogNear: 160,
+      fogFar: 480,
       hemisphereSky: 0xe4f7ff,
       hemisphereGround: 0x6d9a55,
       hemisphereIntensity: 2.2,
@@ -165,9 +173,13 @@ export const TRACK_CONFIGS: Record<TrackId, TrackConfig> = {
     ],
     theme: {
       sky: COLORS.desertSky,
-      fog: COLORS.desertFog,
-      fogNear: 80,
-      fogFar: 165,
+      skyZenith: 0xde8848,
+      skyHorizon: 0xffe2b5,
+      mountainNear: 0xba5c32,
+      mountainFar: 0x8a4028,
+      fog: 0xfebd86,
+      fogNear: 170,
+      fogFar: 500,
       hemisphereSky: 0xffeedb,
       hemisphereGround: 0xa0673b,
       hemisphereIntensity: 2.4,
@@ -210,9 +222,13 @@ export const TRACK_CONFIGS: Record<TrackId, TrackConfig> = {
     ],
     theme: {
       sky: COLORS.snowSky,
-      fog: COLORS.snowFog,
-      fogNear: 85,
-      fogFar: 175,
+      skyZenith: 0x4c88ba,
+      skyHorizon: 0xd8edf8,
+      mountainNear: 0xa2c0d8,
+      mountainFar: 0x6e889a,
+      fog: 0x90c8ea,
+      fogNear: 160,
+      fogFar: 480,
       hemisphereSky: 0xdcf0ff,
       hemisphereGround: 0x789eb8,
       hemisphereIntensity: 2.3,

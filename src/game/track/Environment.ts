@@ -8,7 +8,10 @@ export class Environment {
 
   constructor(private readonly track: Track) {
     this.config = track.config;
+    this.buildSkyDome();
     this.buildGround();
+    this.buildDistantMountains();
+    this.buildClouds();
     if (this.config.id === 'desert') {
       this.buildDesertScenery();
       this.buildDesertStartArch();
@@ -21,11 +24,44 @@ export class Environment {
     }
   }
 
+  private buildSkyDome(): void {
+    const radius = 560;
+    const geometry = new THREE.SphereGeometry(radius, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    const count = geometry.attributes.position.count;
+    const colors = new Float32Array(count * 3);
+    const pos = geometry.attributes.position;
+    const cZenith = new THREE.Color(this.config.theme.skyZenith);
+    const cHorizon = new THREE.Color(this.config.theme.skyHorizon);
+
+    for (let i = 0; i < count; i += 1) {
+      const y = pos.getY(i);
+      const t = Math.max(0, Math.min(1, y / radius));
+      const col = new THREE.Color();
+      col.lerpColors(cHorizon, cZenith, Math.pow(t, 0.42));
+      colors[i * 3] = col.r;
+      colors[i * 3 + 1] = col.g;
+      colors[i * 3 + 2] = col.b;
+    }
+
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const material = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+    });
+    const skyDome = new THREE.Mesh(geometry, material);
+    skyDome.position.y = -4;
+    this.group.add(skyDome);
+  }
+
   private buildGround(): void {
     const isDesert = this.config.id === 'desert';
     const isSnow = this.config.id === 'snow';
+
+    // 1. Inner Ground (receives shadows from karts and scenery)
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(190, 190),
+      new THREE.PlaneGeometry(240, 240),
       new THREE.MeshStandardMaterial({ color: this.config.theme.ground, roughness: isSnow ? 0.88 : 0.95 }),
     );
     ground.rotation.x = -Math.PI / 2;
@@ -33,6 +69,18 @@ export class Environment {
     ground.receiveShadow = true;
     this.group.add(ground);
 
+    // 2. Outer Extended Horizon Ground Ring (seamlessly extends to 560m horizon, 0 shadow overhead)
+    const outerGround = new THREE.Mesh(
+      new THREE.RingGeometry(118, 560, 32, 2),
+      new THREE.MeshBasicMaterial({ color: this.config.theme.ground }),
+    );
+    outerGround.rotation.x = -Math.PI / 2;
+    outerGround.position.y = -0.03;
+    outerGround.receiveShadow = false;
+    outerGround.castShadow = false;
+    this.group.add(outerGround);
+
+    // 3. Ground detail color patches
     const patches = new THREE.Group();
     const patchMaterial = new THREE.MeshStandardMaterial({
       color: this.config.theme.groundPatches,
@@ -50,6 +98,106 @@ export class Environment {
       patches.add(patch);
     }
     this.group.add(patches);
+  }
+
+  private buildDistantMountains(): void {
+    const isDesert = this.config.id === 'desert';
+    const isSnow = this.config.id === 'snow';
+    const group = new THREE.Group();
+    const nearMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainNear, flatShading: true });
+    const farMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainFar, flatShading: true });
+
+    // Layer 1: Mid-Distant Foothills / Mesas / Alpine Peaks (Radius 220m - 270m)
+    const nearCount = 22;
+    for (let i = 0; i < nearCount; i += 1) {
+      const angle = (i / nearCount) * Math.PI * 2 + (i % 3) * 0.08;
+      const r = 225 + (i % 4) * 12;
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+      const height = 38 + (i % 5) * 14;
+      const baseR = 32 + (i % 4) * 9;
+
+      let geom: THREE.BufferGeometry;
+      if (isDesert) {
+        // Sandstone mesas and canyon buttes
+        const topR = baseR * (0.42 + (i % 3) * 0.16);
+        geom = new THREE.CylinderGeometry(topR, baseR, height, 6);
+      } else if (isSnow) {
+        // Alpine sharp jagged peaks
+        geom = new THREE.ConeGeometry(baseR, height * 1.35, 4 + (i % 2));
+      } else {
+        // Rolling green foothills
+        geom = new THREE.ConeGeometry(baseR, height, 5 + (i % 2));
+      }
+
+      const mesh = new THREE.Mesh(geom, nearMat);
+      mesh.position.set(x, height / 2 - 2, z);
+      mesh.rotation.y = angle + (i % 4);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      group.add(mesh);
+
+      // Add snow-cap for snow mountains
+      if (isSnow) {
+        const capGeom = new THREE.ConeGeometry(baseR * 0.42, height * 0.55, 4 + (i % 2));
+        const cap = new THREE.Mesh(capGeom, new THREE.MeshLambertMaterial({ color: COLORS.snowWhite, flatShading: true }));
+        cap.position.set(x, height * 0.95, z);
+        cap.rotation.y = angle + (i % 4);
+        cap.castShadow = false;
+        cap.receiveShadow = false;
+        group.add(cap);
+      }
+    }
+
+    // Layer 2: Extreme Distant Panoramic Mountain Silhouettes (Radius 360m - 430m)
+    const farCount = 28;
+    for (let i = 0; i < farCount; i += 1) {
+      const angle = (i / farCount) * Math.PI * 2 + (i % 2) * 0.06;
+      const r = 375 + (i % 3) * 22;
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+      const height = 70 + (i % 6) * 20;
+      const baseR = 60 + (i % 4) * 15;
+      const geom = new THREE.ConeGeometry(baseR, height, 4 + (i % 2));
+      const mesh = new THREE.Mesh(geom, farMat);
+      mesh.position.set(x, height / 2 - 5, z);
+      mesh.rotation.y = angle * 2;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      group.add(mesh);
+    }
+
+    this.group.add(group);
+  }
+
+  private buildClouds(): void {
+    const isDesert = this.config.id === 'desert';
+    const isSnow = this.config.id === 'snow';
+    const clouds = new THREE.Group();
+    const cloudColor = isDesert ? 0xfff0dd : isSnow ? 0xecf6fc : 0xffffff;
+    const cloudMat = new THREE.MeshBasicMaterial({ color: cloudColor, transparent: true, opacity: 0.85 });
+
+    for (let i = 0; i < 14; i += 1) {
+      const angle = (i / 14) * Math.PI * 2 + (i % 3) * 0.2;
+      const radius = 130 + (i * 37) % 150;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const y = 65 + (i % 4) * 9;
+
+      const cloudCluster = new THREE.Group();
+      cloudCluster.position.set(x, y, z);
+      const puffCount = 3 + (i % 3);
+      for (let p = 0; p < puffCount; p += 1) {
+        const puffSize = 8 + (p % 3) * 3.5;
+        const puffGeom = new THREE.DodecahedronGeometry(puffSize, 0);
+        const puff = new THREE.Mesh(puffGeom, cloudMat);
+        puff.position.set((p - 1) * 7.5, (p % 2) * 2.2, ((p * 2) % 3) * 4);
+        puff.scale.set(1.4, 0.6, 1);
+        cloudCluster.add(puff);
+      }
+      clouds.add(cloudCluster);
+    }
+    this.group.add(clouds);
   }
 
   private isClearOfTrack(position: THREE.Vector3, minClearance = 8.5): boolean {
