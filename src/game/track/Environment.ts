@@ -428,7 +428,7 @@ export class Environment {
     }
 
     // 2. Frozen Ice Lake in wide open infield (safely cleared of all track segments)
-    const iceLakeCenter = new THREE.Vector3(-2, 0, -6);
+    const iceLakeCenter = new THREE.Vector3(-2, 0, -10);
     if (this.isClearOfTrack(iceLakeCenter, 15)) {
       scenery.add(this.createIceLake(iceLakeCenter));
     }
