@@ -111,20 +111,32 @@ export class Track {
 
     for (let i = 0; i < this.samples.length; i += 1) {
       const sample = this.samples[i];
-      const nextIndex = (i + 1) % this.samples.length;
-      const left = sample.position.clone().addScaledVector(sample.lateral, -half);
-      const right = sample.position.clone().addScaledVector(sample.lateral, half);
+      const prev = this.samples[(i - 1 + this.samples.length) % this.samples.length];
+      const next = this.samples[(i + 1) % this.samples.length];
+      const ds = (prev.position.distanceTo(sample.position) + sample.position.distanceTo(next.position)) / 2;
+      const dTan = next.tangent.clone().sub(prev.tangent).length() / Math.max(1e-4, ds * 2);
+      const turnDir = Math.sign(prev.tangent.x * next.tangent.z - prev.tangent.z * next.tangent.x);
+
+      // Adaptive inner road half-width on tight turns to ensure inner edge never folds backward
+      const getRoadHalf = (side: number) => {
+        const isInside = side * turnDir > 0;
+        if (isInside && dTan > 0.08) {
+          return Math.max(3.2, Math.min(half, (1 / dTan) * 0.78));
+        }
+        return half;
+      };
+
+      const leftH = getRoadHalf(-1);
+      const rightH = getRoadHalf(1);
+      const left = sample.position.clone().addScaledVector(sample.lateral, -leftH);
+      const right = sample.position.clone().addScaledVector(sample.lateral, rightH);
       roadPositions.push(left.x, 0.04, left.z, right.x, 0.04, right.z);
 
       const base = i * 2;
       const nextBase = ((i + 1) % this.samples.length) * 2;
-      // The left/right ribbon must wind counter-clockwise when viewed from above.
-      // The previous order produced downward normals, so the road was back-face culled.
       roadIndices.push(base, base + 1, nextBase, base + 1, nextBase + 1, nextBase);
-      const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth));
-      const rightEdge = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth);
-      // Four vertices make two narrow shoulder strips. Building outer-left to outer-right
-      // here would cover the entire asphalt ribbon with the shoulder material.
+      const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(leftH + edgeWidth));
+      const rightEdge = sample.position.clone().addScaledVector(sample.lateral, rightH + edgeWidth);
       edgePositions.push(
         leftEdge.x, 0.055, leftEdge.z,
         left.x, 0.058, left.z,
@@ -205,10 +217,8 @@ export class Track {
     const railMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fence, roughness: 0.66 });
     const postMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fencePost, roughness: 0.72 });
     const capMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fenceCap, roughness: 0.72 });
-    const railOffset = this.fenceLimit;
-    // Connect every post to the next post. The old 15/5 step mismatch left two thirds
-    // of every rail side open, especially noticeable on the long bends.
-    const railStep = 6;
+    const defaultRailOffset = this.fenceLimit;
+    const railStep = 3;
     const segmentCount = this.samples.length / railStep;
     const instanceCount = segmentCount * 2;
     const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.24, 1.08, 0.24), postMaterial, instanceCount);
@@ -226,12 +236,33 @@ export class Track {
     for (let i = 0; i < this.samples.length; i += railStep) {
       const sample = this.samples[i];
       const next = this.samples[(i + railStep) % this.samples.length];
+      const prev = this.samples[(i - railStep + this.samples.length) % this.samples.length];
+      const ds = (prev.position.distanceTo(sample.position) + sample.position.distanceTo(next.position)) / 2;
+      const dTan = next.tangent.clone().sub(prev.tangent).length() / Math.max(1e-4, ds * 2);
+      const turnDir = Math.sign(prev.tangent.x * next.tangent.z - prev.tangent.z * next.tangent.x);
+
       for (const side of [-1, 1]) {
-        const postPosition = sample.position.clone().addScaledVector(sample.lateral, side * railOffset);
-        const nextPostPosition = next.position.clone().addScaledVector(next.lateral, side * railOffset);
+        const getRailOffset = (curTan: number, curDir: number) => {
+          const isInside = side * curDir > 0;
+          if (isInside && curTan > 0.06) {
+            return Math.max(3.6, Math.min(defaultRailOffset, (1 / curTan) * 0.72));
+          }
+          return defaultRailOffset;
+        };
+
+        const nextPrev = sample;
+        const nextNext = this.samples[(i + railStep * 2) % this.samples.length];
+        const nextDs = (nextPrev.position.distanceTo(next.position) + next.position.distanceTo(nextNext.position)) / 2;
+        const nextDTan = nextNext.tangent.clone().sub(nextPrev.tangent).length() / Math.max(1e-4, nextDs * 2);
+        const nextTurnDir = Math.sign(nextPrev.tangent.x * nextNext.tangent.z - nextPrev.tangent.z * nextNext.tangent.x);
+
+        const curOffset = getRailOffset(dTan, turnDir);
+        const nxtOffset = getRailOffset(nextDTan, nextTurnDir);
+
+        const postPosition = sample.position.clone().addScaledVector(sample.lateral, side * curOffset);
+        const nextPostPosition = next.position.clone().addScaledVector(next.lateral, side * nxtOffset);
         const segment = nextPostPosition.clone().sub(postPosition);
         const midpoint = postPosition.clone().lerp(nextPostPosition, 0.5);
-        // Rail geometry is elongated along local +Z, so align +Z with the segment.
         const railYaw = Math.atan2(segment.x, segment.z);
 
         transform.position.copy(postPosition).setY(0.54);
@@ -246,12 +277,12 @@ export class Track {
 
         transform.position.copy(midpoint).setY(0.82);
         transform.rotation.set(0, railYaw, 0);
-        transform.scale.set(1, 1, segment.length() + 0.16);
+        transform.scale.set(1, 1, segment.length() + 0.12);
         transform.updateMatrix();
         upperRails.setMatrixAt(instance, transform.matrix);
 
         transform.position.copy(midpoint).setY(0.48);
-        transform.scale.set(1, 1, segment.length() + 0.16);
+        transform.scale.set(1, 1, segment.length() + 0.12);
         transform.updateMatrix();
         lowerRails.setMatrixAt(instance, transform.matrix);
         instance += 1;
