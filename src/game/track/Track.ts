@@ -101,14 +101,8 @@ export class Track {
     }
   }
 
-  private buildRoad(): void {
-    const roadPositions: number[] = [];
-    const roadIndices: number[] = [];
-    const edgePositions: number[] = [];
-    const edgeIndices: number[] = [];
-    const half = this.roadHalfWidth;
-    const edgeWidth = 0.28;
-
+  private computeSideOffsets(side: number, defaultOffset: number, minOffset: number, scaleFactor: number): Float32Array {
+    const raw = new Float32Array(this.samples.length);
     for (let i = 0; i < this.samples.length; i += 1) {
       const sample = this.samples[i];
       const prev = this.samples[(i - 1 + this.samples.length) % this.samples.length];
@@ -117,17 +111,42 @@ export class Track {
       const dTan = next.tangent.clone().sub(prev.tangent).length() / Math.max(1e-4, ds * 2);
       const turnDir = Math.sign(prev.tangent.x * next.tangent.z - prev.tangent.z * next.tangent.x);
 
-      // Adaptive inner road half-width on tight turns to ensure inner edge never folds backward
-      const getRoadHalf = (side: number) => {
-        const isInside = side * turnDir > 0;
-        if (isInside && dTan > 0.08) {
-          return Math.max(3.2, Math.min(half, (1 / dTan) * 0.78));
-        }
-        return half;
-      };
+      let offset = defaultOffset;
+      const isInside = side * turnDir > 0;
+      if (isInside && dTan > 0.02) {
+        offset = Math.max(minOffset, Math.min(defaultOffset, (1 / dTan) * scaleFactor));
+      }
+      raw[i] = offset;
+    }
 
-      const leftH = getRoadHalf(-1);
-      const rightH = getRoadHalf(1);
+    const smoothed = new Float32Array(this.samples.length);
+    const window = 8;
+    for (let i = 0; i < this.samples.length; i += 1) {
+      let minVal = defaultOffset;
+      for (let w = -window; w <= window; w += 1) {
+        const idx = (i + w + this.samples.length) % this.samples.length;
+        const dist = Math.abs(w);
+        const weight = 1 + dist * 0.22;
+        minVal = Math.min(minVal, raw[idx] * weight);
+      }
+      smoothed[i] = Math.max(minOffset, Math.min(defaultOffset, minVal));
+    }
+    return smoothed;
+  }
+
+  private buildRoad(): void {
+    const roadPositions: number[] = [];
+    const roadIndices: number[] = [];
+    const edgePositions: number[] = [];
+    const edgeIndices: number[] = [];
+    const edgeWidth = 0.28;
+    const leftOffsets = this.computeSideOffsets(-1, this.roadHalfWidth, 3.0, 0.72);
+    const rightOffsets = this.computeSideOffsets(1, this.roadHalfWidth, 3.0, 0.72);
+
+    for (let i = 0; i < this.samples.length; i += 1) {
+      const sample = this.samples[i];
+      const leftH = leftOffsets[i];
+      const rightH = rightOffsets[i];
       const left = sample.position.clone().addScaledVector(sample.lateral, -leftH);
       const right = sample.position.clone().addScaledVector(sample.lateral, rightH);
       roadPositions.push(left.x, 0.04, left.z, right.x, 0.04, right.z);
@@ -217,7 +236,6 @@ export class Track {
     const railMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fence, roughness: 0.66 });
     const postMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fencePost, roughness: 0.72 });
     const capMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fenceCap, roughness: 0.72 });
-    const defaultRailOffset = this.fenceLimit;
     const railStep = 3;
     const segmentCount = this.samples.length / railStep;
     const instanceCount = segmentCount * 2;
@@ -231,33 +249,19 @@ export class Track {
       this.group.add(mesh);
     }
 
+    const leftOffsets = this.computeSideOffsets(-1, this.fenceLimit, 3.2, 0.58);
+    const rightOffsets = this.computeSideOffsets(1, this.fenceLimit, 3.2, 0.58);
+
     const transform = new THREE.Object3D();
     let instance = 0;
     for (let i = 0; i < this.samples.length; i += railStep) {
       const sample = this.samples[i];
       const next = this.samples[(i + railStep) % this.samples.length];
-      const prev = this.samples[(i - railStep + this.samples.length) % this.samples.length];
-      const ds = (prev.position.distanceTo(sample.position) + sample.position.distanceTo(next.position)) / 2;
-      const dTan = next.tangent.clone().sub(prev.tangent).length() / Math.max(1e-4, ds * 2);
-      const turnDir = Math.sign(prev.tangent.x * next.tangent.z - prev.tangent.z * next.tangent.x);
+      const nextIndex = (i + railStep) % this.samples.length;
 
       for (const side of [-1, 1]) {
-        const getRailOffset = (curTan: number, curDir: number) => {
-          const isInside = side * curDir > 0;
-          if (isInside && curTan > 0.06) {
-            return Math.max(3.6, Math.min(defaultRailOffset, (1 / curTan) * 0.72));
-          }
-          return defaultRailOffset;
-        };
-
-        const nextPrev = sample;
-        const nextNext = this.samples[(i + railStep * 2) % this.samples.length];
-        const nextDs = (nextPrev.position.distanceTo(next.position) + next.position.distanceTo(nextNext.position)) / 2;
-        const nextDTan = nextNext.tangent.clone().sub(nextPrev.tangent).length() / Math.max(1e-4, nextDs * 2);
-        const nextTurnDir = Math.sign(nextPrev.tangent.x * nextNext.tangent.z - nextPrev.tangent.z * nextNext.tangent.x);
-
-        const curOffset = getRailOffset(dTan, turnDir);
-        const nxtOffset = getRailOffset(nextDTan, nextTurnDir);
+        const curOffset = side === -1 ? leftOffsets[i] : rightOffsets[i];
+        const nxtOffset = side === -1 ? leftOffsets[nextIndex] : rightOffsets[nextIndex];
 
         const postPosition = sample.position.clone().addScaledVector(sample.lateral, side * curOffset);
         const nextPostPosition = next.position.clone().addScaledVector(next.lateral, side * nxtOffset);
