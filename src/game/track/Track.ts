@@ -152,14 +152,13 @@ export class Track {
 
   private buildRoad(): void {
     const roadPositions: number[] = [];
+    const roadNormals: number[] = [];
     const roadIndices: number[] = [];
     const edgePositions: number[] = [];
+    const edgeNormals: number[] = [];
     const edgeIndices: number[] = [];
-    const deckPositions: number[] = [];
-    const deckIndices: number[] = [];
     const half = this.roadHalfWidth;
     const edgeWidth = 0.28;
-    const skirtDepth = 0.36;
 
     for (let i = 0; i < this.samples.length; i += 1) {
       const sample = this.samples[i];
@@ -167,11 +166,16 @@ export class Track {
       const right = sample.position.clone().addScaledVector(sample.lateral, half);
       const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth));
       const rightEdge = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth);
+      const normal = sample.lateral.clone().cross(sample.tangent).normalize();
 
       // 1. Road surface
       roadPositions.push(
         left.x, left.y + 0.04, left.z,
         right.x, right.y + 0.04, right.z,
+      );
+      roadNormals.push(
+        normal.x, normal.y, normal.z,
+        normal.x, normal.y, normal.z,
       );
       const base = i * 2;
       const nextBase = ((i + 1) % this.samples.length) * 2;
@@ -184,109 +188,51 @@ export class Track {
         right.x, right.y + 0.058, right.z,
         rightEdge.x, rightEdge.y + 0.055, rightEdge.z,
       );
+      edgeNormals.push(
+        normal.x, normal.y, normal.z,
+        normal.x, normal.y, normal.z,
+        normal.x, normal.y, normal.z,
+        normal.x, normal.y, normal.z,
+      );
       const edgeBase = i * 4;
       const edgeNext = ((i + 1) % this.samples.length) * 4;
       edgeIndices.push(edgeBase, edgeBase + 1, edgeNext, edgeBase + 1, edgeNext + 1, edgeNext);
       edgeIndices.push(edgeBase + 2, edgeBase + 3, edgeNext + 2, edgeBase + 3, edgeNext + 3, edgeNext + 2);
-
-      // 3. Side skirts and underside bridge deck
-      deckPositions.push(
-        leftEdge.x, leftEdge.y + 0.05, leftEdge.z,
-        leftEdge.x, leftEdge.y - skirtDepth, leftEdge.z,
-        rightEdge.x, rightEdge.y - skirtDepth, rightEdge.z,
-        rightEdge.x, rightEdge.y + 0.05, rightEdge.z,
-      );
-      const deckBase = i * 4;
-      const deckNext = ((i + 1) % this.samples.length) * 4;
-      // Left outer skirt
-      deckIndices.push(deckBase, deckNext, deckBase + 1, deckBase + 1, deckNext, deckNext + 1);
-      // Right outer skirt
-      deckIndices.push(deckBase + 2, deckNext + 2, deckBase + 3, deckBase + 3, deckNext + 2, deckNext + 3);
-      // Underside bottom slab
-      deckIndices.push(deckBase + 1, deckNext + 1, deckBase + 2, deckBase + 2, deckNext + 1, deckNext + 2);
     }
 
     const roadGeometry = new THREE.BufferGeometry();
     roadGeometry.setAttribute('position', new THREE.Float32BufferAttribute(roadPositions, 3));
-    roadGeometry.computeVertexNormals();
+    roadGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(roadNormals, 3));
     roadGeometry.setIndex(roadIndices);
     const road = new THREE.Mesh(
       roadGeometry,
-      new THREE.MeshStandardMaterial({ color: this.config.theme.road, roughness: 0.88, side: THREE.FrontSide }),
+      new THREE.MeshStandardMaterial({
+        color: this.config.theme.road,
+        roughness: 0.88,
+        metalness: 0,
+        side: THREE.DoubleSide,
+      }),
     );
     road.receiveShadow = true;
     this.group.add(road);
 
     const edgeGeometry = new THREE.BufferGeometry();
     edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
-    edgeGeometry.computeVertexNormals();
+    edgeGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(edgeNormals, 3));
     edgeGeometry.setIndex(edgeIndices);
     const edge = new THREE.Mesh(
       edgeGeometry,
-      new THREE.MeshStandardMaterial({ color: this.config.theme.roadEdge, roughness: 0.82, side: THREE.FrontSide }),
+      new THREE.MeshStandardMaterial({
+        color: this.config.theme.roadEdge,
+        roughness: 0.82,
+        side: THREE.DoubleSide,
+      }),
     );
     edge.receiveShadow = true;
     this.group.add(edge);
 
-    const deckGeometry = new THREE.BufferGeometry();
-    deckGeometry.setAttribute('position', new THREE.Float32BufferAttribute(deckPositions, 3));
-    deckGeometry.computeVertexNormals();
-    deckGeometry.setIndex(deckIndices);
-    const deck = new THREE.Mesh(
-      deckGeometry,
-      new THREE.MeshStandardMaterial({ color: this.config.theme.fencePost, roughness: 0.85, metalness: 0.1, side: THREE.DoubleSide }),
-    );
-    deck.castShadow = true;
-    deck.receiveShadow = true;
-    this.group.add(deck);
-
-    this.buildBridgePillars();
     this.buildCenterMarkers();
     this.buildGuardRails();
-  }
-
-  private buildBridgePillars(): void {
-    const pillarMaterial = new THREE.MeshStandardMaterial({
-      color: this.config.theme.fencePost,
-      roughness: 0.8,
-      flatShading: true,
-    });
-    const beamMaterial = new THREE.MeshStandardMaterial({
-      color: this.config.theme.fenceCap,
-      roughness: 0.7,
-      flatShading: true,
-    });
-
-    const step = 8;
-    for (let i = 0; i < this.samples.length; i += step) {
-      const sample = this.samples[i];
-      if (sample.position.y <= 1.4) continue;
-
-      const height = sample.position.y - 0.2;
-      const leftPos = sample.position.clone().addScaledVector(sample.lateral, -this.roadHalfWidth - 0.1);
-      const rightPos = sample.position.clone().addScaledVector(sample.lateral, this.roadHalfWidth + 0.1);
-
-      // Left support pillar
-      const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, height, 7), pillarMaterial);
-      leftPillar.position.set(leftPos.x, height / 2, leftPos.z);
-      leftPillar.castShadow = true;
-      leftPillar.receiveShadow = true;
-      this.group.add(leftPillar);
-
-      // Right support pillar
-      const rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, height, 7), pillarMaterial);
-      rightPillar.position.set(rightPos.x, height / 2, rightPos.z);
-      rightPillar.castShadow = true;
-      rightPillar.receiveShadow = true;
-      this.group.add(rightPillar);
-
-      // Cross girder beam connecting the pillars directly under the deck
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(this.roadHalfWidth * 2 + 0.8, 0.45, 0.8), beamMaterial);
-      beam.position.copy(sample.position).add(new THREE.Vector3(0, -0.32, 0));
-      beam.rotation.y = Math.atan2(sample.tangent.x, sample.tangent.z);
-      beam.castShadow = true;
-      this.group.add(beam);
-    }
   }
 
   private buildCenterMarkers(): void {

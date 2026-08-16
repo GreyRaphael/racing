@@ -73,6 +73,25 @@ export class Environment {
     this.group.add(skyDome);
   }
 
+  getTerrainHeight(x: number, z: number): number {
+    const query = this.track.getNearest(new THREE.Vector3(x, 0, z));
+    const trackY = query.sample.position.y;
+    if (trackY <= 0.01) return 0;
+
+    const d = Math.abs(query.lateralOffset);
+    const shoulderWidth = this.track.roadHalfWidth + 1.2;
+    if (d <= shoulderWidth) {
+      return Math.max(0, trackY - 0.03);
+    }
+    const maxSlopeDist = 28.0;
+    if (d >= maxSlopeDist) {
+      return 0;
+    }
+    const t = (d - shoulderWidth) / (maxSlopeDist - shoulderWidth);
+    const weight = Math.cos(t * Math.PI * 0.5);
+    return Math.max(0, (trackY - 0.03) * weight * weight);
+  }
+
   private buildGround(): void {
     const isDesert = this.config.id === 'desert';
     const isSnow = this.config.id === 'snow';
@@ -80,19 +99,33 @@ export class Environment {
     const isCitadel = this.config.id === 'citadel';
     const isCrystal = this.config.id === 'crystal';
 
-    // 1. Inner Ground (receives shadows from karts and scenery)
+    // 1. Deformable 3D Terrain Mesh following track elevation
+    const groundGeom = new THREE.PlaneGeometry(280, 280, 96, 96);
+    groundGeom.rotateX(-Math.PI / 2);
+    const posAttr = groundGeom.attributes.position;
+    const vertexCount = posAttr.count;
+    for (let i = 0; i < vertexCount; i += 1) {
+      const vx = posAttr.getX(i);
+      const vz = posAttr.getZ(i);
+      const vy = this.getTerrainHeight(vx, vz);
+      posAttr.setY(i, vy);
+    }
+    groundGeom.computeVertexNormals();
+
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(240, 240),
-      new THREE.MeshStandardMaterial({ color: this.config.theme.ground, roughness: isSnow || isLava || isCitadel || isCrystal ? 0.88 : 0.95 }),
+      groundGeom,
+      new THREE.MeshStandardMaterial({
+        color: this.config.theme.ground,
+        roughness: isSnow || isLava || isCitadel || isCrystal ? 0.88 : 0.95,
+      }),
     );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.02;
+    ground.position.y = -0.01;
     ground.receiveShadow = true;
     this.group.add(ground);
 
     // 2. Outer Extended Horizon Ground Ring (seamlessly extends to 560m horizon, 0 shadow overhead)
     const outerGround = new THREE.Mesh(
-      new THREE.RingGeometry(118, 560, 32, 2),
+      new THREE.RingGeometry(138, 560, 32, 2),
       new THREE.MeshBasicMaterial({ color: this.config.theme.ground }),
     );
     outerGround.rotation.x = -Math.PI / 2;
@@ -101,7 +134,7 @@ export class Environment {
     outerGround.castShadow = false;
     this.group.add(outerGround);
 
-    // 3. Ground detail color patches
+    // 3. Ground detail color patches snapped to 3D terrain
     const patches = new THREE.Group();
     const patchMaterial = new THREE.MeshStandardMaterial({
       color: this.config.theme.groundPatches,
@@ -112,9 +145,12 @@ export class Environment {
     for (let i = 0; i < 32; i += 1) {
       const angle = i * 2.399;
       const radius = 13 + (i * 17) % 58;
+      const px = Math.cos(angle) * radius;
+      const pz = Math.sin(angle) * radius;
+      const py = this.getTerrainHeight(px, pz) + 0.015;
       const patch = new THREE.Mesh(new THREE.CircleGeometry(2.6 + (i % 5) * 0.8, 7), patchMaterial);
       patch.rotation.x = -Math.PI / 2;
-      patch.position.set(Math.cos(angle) * radius, 0.005, Math.sin(angle) * radius);
+      patch.position.set(px, py, pz);
       patch.scale.set(isDesert || isLava || isCitadel ? 2.2 : 1.7, 1, 0.65 + (i % 3) * 0.2);
       patches.add(patch);
     }
@@ -130,81 +166,54 @@ export class Environment {
     const isAutumn = this.config.id === 'autumn';
     const isCitadel = this.config.id === 'citadel';
     const isCrystal = this.config.id === 'crystal';
-    const group = new THREE.Group();
-    const nearMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainNear, flatShading: true });
-    const farMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainFar, flatShading: true });
 
-    // Layer 1: Mid-Distant Foothills / Mesas / Alpine Peaks / Volcanic Cones / Fortresses (Radius 220m - 270m)
-    const nearCount = 22;
-    for (let i = 0; i < nearCount; i += 1) {
-      const angle = (i / nearCount) * Math.PI * 2 + (i % 3) * 0.08;
-      const r = 225 + (i % 4) * 12;
-      const x = Math.cos(angle) * r;
-      const z = Math.sin(angle) * r;
-      const height = 38 + (i % 5) * 14;
-      const baseR = 32 + (i % 4) * 9;
+    const mountainGroup = new THREE.Group();
+    const mountainCount = 28;
+    const radius = 340;
 
-      let geom: THREE.BufferGeometry;
-      if (isDesert) {
-        // Sandstone mesas and canyon buttes
-        const topR = baseR * (0.42 + (i % 3) * 0.16);
-        geom = new THREE.CylinderGeometry(topR, baseR, height, 6);
-      } else if (isSnow || isLava || isCrystal) {
-        // Alpine sharp jagged peaks or crystalline sharp caverns
-        geom = new THREE.ConeGeometry(baseR, height * 1.35, 4 + (i % 2));
-      } else if (isCitadel) {
-        // Fortress battlements and cylindrical bastion towers
-        const topR = baseR * 0.75;
-        geom = new THREE.CylinderGeometry(topR, baseR, height * 0.9, 8);
-      } else if (isAtoll) {
-        // Tropical ocean volcanic island cones
-        geom = new THREE.ConeGeometry(baseR * 1.15, height * 0.85, 5 + (i % 2));
-      } else if (isAutumn || isSakura) {
-        // Serene mountain ridges
-        geom = new THREE.ConeGeometry(baseR, height * 1.1, 5 + (i % 2));
-      } else {
-        // Rolling green foothills
-        geom = new THREE.ConeGeometry(baseR, height, 5 + (i % 2));
-      }
+    const nearMaterial = new THREE.MeshStandardMaterial({
+      color: this.config.theme.mountainNear,
+      roughness: 0.95,
+      flatShading: true,
+    });
+    const farMaterial = new THREE.MeshStandardMaterial({
+      color: this.config.theme.mountainFar,
+      roughness: 0.98,
+      flatShading: true,
+    });
 
-      const mesh = new THREE.Mesh(geom, nearMat);
-      mesh.position.set(x, height / 2 - 2, z);
-      mesh.rotation.y = angle + (i % 4);
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      group.add(mesh);
+    for (let i = 0; i < mountainCount; i += 1) {
+      const angle = (i / mountainCount) * Math.PI * 2 + (i % 3) * 0.08;
+      const dist = radius + (i % 5) * 35;
+      const x = Math.cos(angle) * dist;
+      const z = Math.sin(angle) * dist;
 
-      // Add snow-cap for snow mountains or Fuji silhouette
-      if (isSnow || (isSakura && i % 4 === 0)) {
-        const capGeom = new THREE.ConeGeometry(baseR * 0.42, height * 0.55, 4 + (i % 2));
-        const cap = new THREE.Mesh(capGeom, new THREE.MeshLambertMaterial({ color: COLORS.snowWhite, flatShading: true }));
-        cap.position.set(x, height * 0.95, z);
-        cap.rotation.y = angle + (i % 4);
-        cap.castShadow = false;
-        cap.receiveShadow = false;
-        group.add(cap);
+      const isNear = i % 2 === 0;
+      const height = isNear ? 75 + (i % 4) * 28 : 110 + (i % 5) * 36;
+      const baseRadius = isNear ? 55 + (i % 3) * 18 : 78 + (i % 4) * 24;
+      const segments = isDesert ? 4 : isSnow ? 5 : isLava ? 6 : isCitadel ? 5 : isCrystal ? 6 : 5;
+
+      const mountainGeom = new THREE.ConeGeometry(baseRadius, height, segments);
+      const mountain = new THREE.Mesh(mountainGeom, isNear ? nearMaterial : farMaterial);
+      mountain.position.set(x, height * 0.45, z);
+      mountain.scale.set(1 + (i % 3) * 0.25, 1, 1 + ((i + 1) % 3) * 0.25);
+      mountain.rotation.y = i * 1.35;
+      mountain.castShadow = false;
+      mountain.receiveShadow = false;
+      mountainGroup.add(mountain);
+
+      if (isSnow) {
+        const snowCapHeight = height * 0.38;
+        const snowCapRadius = baseRadius * 0.42;
+        const snowCapGeom = new THREE.ConeGeometry(snowCapRadius, snowCapHeight, segments);
+        const snowCap = new THREE.Mesh(snowCapGeom, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }));
+        snowCap.position.set(x, height * 0.45 + height * 0.32, z);
+        snowCap.scale.copy(mountain.scale);
+        snowCap.rotation.y = mountain.rotation.y;
+        mountainGroup.add(snowCap);
       }
     }
-
-    // Layer 2: Extreme Distant Panoramic Mountain Silhouettes (Radius 360m - 430m)
-    const farCount = 28;
-    for (let i = 0; i < farCount; i += 1) {
-      const angle = (i / farCount) * Math.PI * 2 + (i % 2) * 0.06;
-      const r = 375 + (i % 3) * 22;
-      const x = Math.cos(angle) * r;
-      const z = Math.sin(angle) * r;
-      const height = 70 + (i % 6) * 20;
-      const baseR = 60 + (i % 4) * 15;
-      const geom = new THREE.ConeGeometry(baseR, height, 4 + (i % 2));
-      const mesh = new THREE.Mesh(geom, farMat);
-      mesh.position.set(x, height / 2 - 5, z);
-      mesh.rotation.y = angle * 2;
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      group.add(mesh);
-    }
-
-    this.group.add(group);
+    this.group.add(mountainGroup);
   }
 
   private buildClouds(): void {
@@ -296,7 +305,7 @@ export class Environment {
 
   private createMeadowTree(position: THREE.Vector3, scale: number): THREE.Group {
     const tree = new THREE.Group();
-    tree.position.copy(position);
+    tree.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     tree.scale.setScalar(scale);
     const trunk = new THREE.Mesh(
       new THREE.CylinderGeometry(0.25, 0.38, 2.2, 6),
@@ -327,7 +336,8 @@ export class Environment {
       new THREE.DodecahedronGeometry(1.15, 0),
       new THREE.MeshStandardMaterial({ color: COLORS.rock, flatShading: true, roughness: 1 }),
     );
-    rock.position.copy(position).setY(0.7);
+    const groundY = this.getTerrainHeight(position.x, position.z);
+    rock.position.set(position.x, groundY + 0.45 * scale, position.z);
     rock.scale.set(scale * 1.25, scale * 0.72, scale);
     rock.rotation.set(0.1, position.x * 0.08, 0.08);
     rock.castShadow = true;
@@ -336,7 +346,7 @@ export class Environment {
 
   private createMeadowFlowers(position: THREE.Vector3, seed: number): THREE.Group {
     const flowers = new THREE.Group();
-    flowers.position.copy(position);
+    flowers.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     for (let i = 0; i < 5; i += 1) {
       const flower = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.13, 0),
@@ -432,7 +442,7 @@ export class Environment {
 
   private createCactus(position: THREE.Vector3, scale: number, seed: number): THREE.Group {
     const cactus = new THREE.Group();
-    cactus.position.copy(position);
+    cactus.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     cactus.scale.setScalar(scale);
 
     const cactusMaterial = new THREE.MeshStandardMaterial({
@@ -482,7 +492,7 @@ export class Environment {
 
   private createDesertPalm(position: THREE.Vector3, scale: number): THREE.Group {
     const palm = new THREE.Group();
-    palm.position.copy(position);
+    palm.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     palm.scale.setScalar(scale);
 
     const trunkMaterial = new THREE.MeshStandardMaterial({ color: COLORS.palmTrunk, roughness: 0.95, flatShading: true });
@@ -516,7 +526,8 @@ export class Environment {
       new THREE.DodecahedronGeometry(1.35, 0),
       new THREE.MeshStandardMaterial({ color: COLORS.canyonRock, flatShading: true, roughness: 0.88 }),
     );
-    rock.position.copy(position).setY(0.85);
+    const groundY = this.getTerrainHeight(position.x, position.z);
+    rock.position.set(position.x, groundY + 0.5 * scale, position.z);
     rock.scale.set(scale * 1.4, scale * 0.85, scale * 1.15);
     rock.rotation.set(0.12, position.x * 0.06, 0.08);
     rock.castShadow = true;
@@ -525,7 +536,7 @@ export class Environment {
 
   private createTumbleweed(position: THREE.Vector3, seed: number): THREE.Group {
     const weed = new THREE.Group();
-    weed.position.copy(position);
+    weed.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     const material = new THREE.MeshStandardMaterial({ color: 0xb58852, roughness: 1, flatShading: true });
     const count = 3 + (seed % 3);
     for (let i = 0; i < count; i += 1) {
@@ -539,7 +550,8 @@ export class Environment {
 
   private createOasis(position: THREE.Vector3): THREE.Group {
     const oasis = new THREE.Group();
-    oasis.position.copy(position);
+    const groundY = this.getTerrainHeight(position.x, position.z);
+    oasis.position.set(position.x, groundY, position.z);
 
     // Water pool
     const water = new THREE.Mesh(
@@ -654,7 +666,7 @@ export class Environment {
 
   private createSnowPine(position: THREE.Vector3, scale: number): THREE.Group {
     const pine = new THREE.Group();
-    pine.position.copy(position);
+    pine.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     pine.scale.setScalar(scale);
 
     const trunk = new THREE.Mesh(
@@ -703,7 +715,7 @@ export class Environment {
 
   private createIceCrystal(position: THREE.Vector3, scale: number, seed: number): THREE.Group {
     const crystalGroup = new THREE.Group();
-    crystalGroup.position.copy(position);
+    crystalGroup.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     crystalGroup.scale.setScalar(scale);
 
     const crystalMaterial = new THREE.MeshStandardMaterial({
@@ -740,14 +752,14 @@ export class Environment {
 
   private createFrostRock(position: THREE.Vector3, scale: number): THREE.Group {
     const rockGroup = new THREE.Group();
-    rockGroup.position.copy(position);
+    rockGroup.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     rockGroup.scale.setScalar(scale);
 
     const rock = new THREE.Mesh(
       new THREE.DodecahedronGeometry(1.3, 0),
       new THREE.MeshStandardMaterial({ color: COLORS.snowRock, flatShading: true, roughness: 0.92 }),
     );
-    rock.position.y = 0.85;
+    rock.position.y = 0.5 * scale;
     rock.scale.set(1.35, 0.82, 1.15);
     rock.rotation.set(0.1, position.x * 0.07, 0.08);
     rock.castShadow = true;
@@ -758,7 +770,7 @@ export class Environment {
       new THREE.DodecahedronGeometry(1.05, 0),
       new THREE.MeshStandardMaterial({ color: COLORS.snowWhite, flatShading: true, roughness: 0.88 }),
     );
-    snowLayer.position.set(0, 1.32, 0);
+    snowLayer.position.set(0, 0.5 * scale + 0.45, 0);
     snowLayer.scale.set(1.22, 0.38, 1.05);
     snowLayer.castShadow = true;
     rockGroup.add(snowLayer);
@@ -768,7 +780,7 @@ export class Environment {
 
   private createSnowman(position: THREE.Vector3, scale: number): THREE.Group {
     const snowman = new THREE.Group();
-    snowman.position.copy(position);
+    snowman.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     snowman.scale.setScalar(scale);
 
     const snowMaterial = new THREE.MeshStandardMaterial({ color: COLORS.snowWhite, roughness: 0.85 });
@@ -823,7 +835,8 @@ export class Environment {
 
   private createIceLake(position: THREE.Vector3): THREE.Group {
     const lake = new THREE.Group();
-    lake.position.copy(position);
+    const groundY = this.getTerrainHeight(position.x, position.z);
+    lake.position.set(position.x, groundY, position.z);
 
     // Frozen ice sheet
     const ice = new THREE.Mesh(
@@ -931,7 +944,7 @@ export class Environment {
 
   private createPalmTree(position: THREE.Vector3, scale = 1): THREE.Group {
     const tree = new THREE.Group();
-    tree.position.copy(position);
+    tree.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     tree.scale.setScalar(scale);
 
     const trunkMat = new THREE.MeshStandardMaterial({ color: COLORS.palmTrunk, roughness: 0.85, flatShading: true });
@@ -981,7 +994,7 @@ export class Environment {
 
   private createBeachUmbrella(position: THREE.Vector3, scale = 1): THREE.Group {
     const umbrella = new THREE.Group();
-    umbrella.position.copy(position);
+    umbrella.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     umbrella.scale.setScalar(scale);
 
     const woodMat = new THREE.MeshStandardMaterial({ color: 0xc49d68, roughness: 0.8 });
@@ -1013,21 +1026,21 @@ export class Environment {
 
   private createSeashellRock(position: THREE.Vector3, scale = 1): THREE.Group {
     const rockGroup = new THREE.Group();
-    rockGroup.position.copy(position);
+    rockGroup.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     rockGroup.scale.setScalar(scale);
 
     const rockMat = new THREE.MeshStandardMaterial({ color: COLORS.atollReef, roughness: 0.9, flatShading: true });
     const starMat = new THREE.MeshStandardMaterial({ color: 0xeb5b5b, roughness: 0.7, flatShading: true });
 
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), rockMat);
-    rock.position.y = 0.6;
+    rock.position.y = 0.45 * scale;
     rock.scale.set(1.4, 0.8, 1.1);
     rock.castShadow = true;
     rockGroup.add(rock);
 
     // Starfish on rock
     const star = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.1, 5), starMat);
-    star.position.set(0.4, 1.15, 0.3);
+    star.position.set(0.4, 0.45 * scale + 0.55, 0.3);
     star.rotation.x = 0.4;
     rockGroup.add(star);
 
@@ -1036,7 +1049,8 @@ export class Environment {
 
   private createTropicalBasin(position: THREE.Vector3): THREE.Group {
     const basin = new THREE.Group();
-    basin.position.copy(position);
+    const groundY = this.getTerrainHeight(position.x, position.z);
+    basin.position.set(position.x, groundY, position.z);
 
     const water = new THREE.Mesh(
       new THREE.CircleGeometry(6.4, 16),
@@ -1138,7 +1152,7 @@ export class Environment {
 
   private createMapleTree(position: THREE.Vector3, scale = 1, variant = 0): THREE.Group {
     const tree = new THREE.Group();
-    tree.position.copy(position);
+    tree.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     tree.scale.setScalar(scale);
 
     const trunkMat = new THREE.MeshStandardMaterial({ color: COLORS.mapleTrunk, roughness: 0.85, flatShading: true });
@@ -1168,7 +1182,7 @@ export class Environment {
 
   private createWindmill(position: THREE.Vector3, scale = 1): THREE.Group {
     const windmill = new THREE.Group();
-    windmill.position.copy(position);
+    windmill.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     windmill.scale.setScalar(scale);
 
     const bodyMat = new THREE.MeshStandardMaterial({ color: COLORS.windmillWood, roughness: 0.85, flatShading: true });
@@ -1201,7 +1215,7 @@ export class Environment {
 
   private createAutumnStoneLantern(position: THREE.Vector3, scale = 1): THREE.Group {
     const lantern = new THREE.Group();
-    lantern.position.copy(position);
+    lantern.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     lantern.scale.setScalar(scale);
 
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0x827c76, roughness: 0.9, flatShading: true });
@@ -1304,7 +1318,7 @@ export class Environment {
 
   private createBasaltPillar(position: THREE.Vector3, scale = 1, height = 4): THREE.Group {
     const cluster = new THREE.Group();
-    cluster.position.copy(position);
+    cluster.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     cluster.scale.setScalar(scale);
 
     const basaltMat = new THREE.MeshStandardMaterial({ color: COLORS.basaltPillar, roughness: 0.88, flatShading: true });
@@ -1327,7 +1341,8 @@ export class Environment {
 
   private createMagmaPool(position: THREE.Vector3, radius = 4.2): THREE.Group {
     const pool = new THREE.Group();
-    pool.position.copy(position);
+    const groundY = this.getTerrainHeight(position.x, position.z);
+    pool.position.set(position.x, groundY, position.z);
 
     const lavaMesh = new THREE.Mesh(
       new THREE.CircleGeometry(radius, 14),
@@ -1357,12 +1372,12 @@ export class Environment {
 
   private createVolcanicRock(position: THREE.Vector3, scale = 1): THREE.Group {
     const group = new THREE.Group();
-    group.position.copy(position);
+    group.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     group.scale.setScalar(scale);
 
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x362c30, roughness: 0.92, flatShading: true });
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), rockMat);
-    rock.position.y = 0.75;
+    rock.position.y = 0.5 * scale;
     rock.scale.set(1.3, 1.1, 1.4);
     rock.castShadow = true;
     group.add(rock);
@@ -1449,7 +1464,7 @@ export class Environment {
 
   private createSakuraTree(position: THREE.Vector3, scale = 1): THREE.Group {
     const tree = new THREE.Group();
-    tree.position.copy(position);
+    tree.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     tree.scale.setScalar(scale);
 
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x543828, roughness: 0.85, flatShading: true });
@@ -1483,7 +1498,7 @@ export class Environment {
 
   private createToroLantern(position: THREE.Vector3, scale = 1): THREE.Group {
     const toro = new THREE.Group();
-    toro.position.copy(position);
+    toro.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     toro.scale.setScalar(scale);
 
     const stoneMat = new THREE.MeshStandardMaterial({ color: COLORS.stoneToro, roughness: 0.88, flatShading: true });
@@ -1519,14 +1534,14 @@ export class Environment {
 
   private createZenRock(position: THREE.Vector3, scale = 1): THREE.Group {
     const group = new THREE.Group();
-    group.position.copy(position);
+    group.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     group.scale.setScalar(scale);
 
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x727e85, roughness: 0.9, flatShading: true });
     const mossMat = new THREE.MeshStandardMaterial({ color: 0x5a8a52, roughness: 0.95 });
 
     const mainRock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.1, 0), rockMat);
-    mainRock.position.y = 0.65;
+    mainRock.position.y = 0.45 * scale;
     mainRock.scale.set(1.4, 0.9, 1.1);
     mainRock.castShadow = true;
     group.add(mainRock);
@@ -1625,7 +1640,7 @@ export class Environment {
 
   private createRotatingGear(position: THREE.Vector3, scale = 1): THREE.Group {
     const gearGroup = new THREE.Group();
-    gearGroup.position.copy(position);
+    gearGroup.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     gearGroup.scale.setScalar(scale);
 
     const brassMat = new THREE.MeshStandardMaterial({
@@ -1669,7 +1684,7 @@ export class Environment {
 
   private createSteamPipe(position: THREE.Vector3, scale = 1): THREE.Group {
     const pipeGroup = new THREE.Group();
-    pipeGroup.position.copy(position);
+    pipeGroup.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     pipeGroup.scale.setScalar(scale);
 
     const copperMat = new THREE.MeshStandardMaterial({
@@ -1704,7 +1719,7 @@ export class Environment {
 
   private createCastleSpire(position: THREE.Vector3, scale = 1): THREE.Group {
     const spire = new THREE.Group();
-    spire.position.copy(position);
+    spire.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     spire.scale.setScalar(scale);
 
     const stoneMat = new THREE.MeshStandardMaterial({
@@ -1742,7 +1757,7 @@ export class Environment {
 
   private createGasLamp(position: THREE.Vector3, scale = 1): THREE.Group {
     const lamp = new THREE.Group();
-    lamp.position.copy(position);
+    lamp.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     lamp.scale.setScalar(scale);
 
     const ironMat = new THREE.MeshStandardMaterial({ color: 0x221f1d, roughness: 0.7, metalness: 0.8 });
@@ -1845,7 +1860,7 @@ export class Environment {
 
   private createCrystalCluster(position: THREE.Vector3, scale = 1, variant = 0): THREE.Group {
     const cluster = new THREE.Group();
-    cluster.position.copy(position);
+    cluster.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     cluster.scale.setScalar(scale);
 
     const isPurple = variant === 0;
@@ -1889,7 +1904,7 @@ export class Environment {
 
   private createMinecartShaft(position: THREE.Vector3, scale = 1): THREE.Group {
     const shaft = new THREE.Group();
-    shaft.position.copy(position);
+    shaft.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     shaft.scale.setScalar(scale);
 
     const woodMat = new THREE.MeshStandardMaterial({ color: COLORS.crystalWood, roughness: 0.85, flatShading: true });
@@ -1929,7 +1944,7 @@ export class Environment {
 
   private createGlowRock(position: THREE.Vector3, scale = 1): THREE.Group {
     const group = new THREE.Group();
-    group.position.copy(position);
+    group.position.set(position.x, this.getTerrainHeight(position.x, position.z), position.z);
     group.scale.setScalar(scale);
 
     const rockMat = new THREE.MeshStandardMaterial({ color: COLORS.crystalCaveRock, roughness: 0.92, flatShading: true });
@@ -1942,14 +1957,14 @@ export class Environment {
     });
 
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), rockMat);
-    rock.position.y = 0.8;
+    rock.position.y = 0.5 * scale;
     rock.scale.set(1.3, 1.2, 1.4);
     rock.castShadow = true;
     group.add(rock);
 
     // Small glowing shard on top
     const shard = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.9, 6), crystalMat);
-    shard.position.set(0.3, 1.8, 0.2);
+    shard.position.set(0.3, 0.5 * scale + 1.0, 0.2);
     shard.rotation.z = 0.2;
     group.add(shard);
 
