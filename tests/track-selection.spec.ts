@@ -9,9 +9,11 @@ const ALL_TRACKS: { id: TrackName; name: string; shortCode: string }[] = [
   { id: 'autumn', name: '枫叶山谷', shortCode: 'MVC' },
   { id: 'lava', name: '熔岩裂谷', shortCode: 'MCC' },
   { id: 'sakura', name: '樱花幽谷', shortCode: 'SGC' },
+  { id: 'citadel', name: '蒸汽古堡', shortCode: 'CCC' },
+  { id: 'crystal', name: '水晶矿洞', shortCode: 'CCG' },
 ];
 
-test('菜单可切换选择全部7大地图并更新展示与3D状态', async ({ page }) => {
+test('菜单可切换选择全部9大地图并更新展示与3D状态', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('track-menu')).toBeVisible();
 
@@ -68,57 +70,57 @@ test('碧海环礁与枫叶山谷多人比赛正常生成、显示专属标识�
   await expect(page.locator('#results-caption')).toContainText('枫叶山谷');
 });
 
-test('熔岩裂谷与樱花幽谷多人比赛正常生成、显示专属标识与结算', async ({ page }) => {
-  // Test Lava
-  await startMode(page, 'race', 'lava');
+test('蒸汽古堡与水晶矿洞多人比赛正常生成、显示专属标识与结算', async ({ page }) => {
+  // Test Citadel
+  await startMode(page, 'race', 'citadel');
   await expect(page.getByTestId('race-hud')).toBeVisible();
-  await expect(page.locator('#brand-mark')).toContainText('MCC');
+  await expect(page.locator('#brand-mark')).toContainText('CCC');
   let state = await debugState(page);
-  expect(state.trackId).toBe('lava');
+  expect(state.trackId).toBe('citadel');
   expect((state.karts as unknown[]).length).toBe(4);
   await debugAdvance(page, 4);
   await debugFinish(page);
   await expect(page.getByTestId('results-panel')).toBeVisible();
-  await expect(page.locator('#results-caption')).toContainText('熔岩裂谷');
+  await expect(page.locator('#results-caption')).toContainText('蒸汽古堡');
 
-  // Test Sakura
+  // Test Crystal
   await page.getByTestId('back-to-menu').click();
-  await startMode(page, 'race', 'sakura');
+  await startMode(page, 'race', 'crystal');
   await expect(page.getByTestId('race-hud')).toBeVisible();
-  await expect(page.locator('#brand-mark')).toContainText('SGC');
+  await expect(page.locator('#brand-mark')).toContainText('CCG');
   state = await debugState(page);
-  expect(state.trackId).toBe('sakura');
+  expect(state.trackId).toBe('crystal');
   expect((state.karts as unknown[]).length).toBe(4);
   await debugAdvance(page, 4);
   await debugFinish(page);
   await expect(page.getByTestId('results-panel')).toBeVisible();
-  await expect(page.locator('#results-caption')).toContainText('樱花幽谷');
+  await expect(page.locator('#results-caption')).toContainText('水晶矿洞');
 });
 
-test('四大新地图个人计时赛能独立记录成绩并持久化', async ({ page }) => {
-  await startMode(page, 'time-trial', 'sakura');
+test('全部新地图个人计时赛能独立记录成绩并持久化', async ({ page }) => {
+  await startMode(page, 'time-trial', 'citadel');
   await expect(page.getByTestId('race-hud')).toBeVisible();
-  await expect(page.locator('#mode-label')).toContainText('樱花幽谷');
+  await expect(page.locator('#mode-label')).toContainText('蒸汽古堡');
 
   await debugAdvance(page, 4);
   await debugFinish(page);
   await expect(page.getByTestId('results-panel')).toBeVisible();
 
-  // Return to menu and verify sakura record is visible
+  // Return to menu and verify citadel record is visible
   await page.getByTestId('back-to-menu').click();
   await expect(page.getByTestId('track-menu')).toBeVisible();
-  await selectTrack(page, 'sakura');
+  await selectTrack(page, 'citadel');
   await expect(page.locator('#menu-record')).not.toContainText('暂无记录');
 
   // Verify other records remain independent
-  for (const track of ['atoll', 'autumn', 'lava'] as TrackName[]) {
+  for (const track of ['atoll', 'autumn', 'lava', 'sakura', 'crystal'] as TrackName[]) {
     await selectTrack(page, track);
     const storage = await page.evaluate((id) => window.__gameDebug?.getStorage(id), track);
     expect(storage).toBeDefined();
   }
 });
 
-test('全量7大赛道的所有景观植物均不侵入赛道', async ({ page }) => {
+test('全量9大赛道的所有景观植物均不侵入赛道', async ({ page }) => {
   await page.goto('/');
 
   for (const track of ALL_TRACKS) {

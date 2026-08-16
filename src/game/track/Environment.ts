@@ -30,6 +30,12 @@ export class Environment {
     } else if (this.config.id === 'sakura') {
       this.buildSakuraScenery();
       this.buildSakuraStartArch();
+    } else if (this.config.id === 'citadel') {
+      this.buildCitadelScenery();
+      this.buildCitadelStartArch();
+    } else if (this.config.id === 'crystal') {
+      this.buildCrystalScenery();
+      this.buildCrystalStartArch();
     } else {
       this.buildMeadowScenery();
       this.buildMeadowStartArch();
@@ -71,11 +77,13 @@ export class Environment {
     const isDesert = this.config.id === 'desert';
     const isSnow = this.config.id === 'snow';
     const isLava = this.config.id === 'lava';
+    const isCitadel = this.config.id === 'citadel';
+    const isCrystal = this.config.id === 'crystal';
 
     // 1. Inner Ground (receives shadows from karts and scenery)
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(240, 240),
-      new THREE.MeshStandardMaterial({ color: this.config.theme.ground, roughness: isSnow || isLava ? 0.88 : 0.95 }),
+      new THREE.MeshStandardMaterial({ color: this.config.theme.ground, roughness: isSnow || isLava || isCitadel || isCrystal ? 0.88 : 0.95 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.02;
@@ -99,7 +107,7 @@ export class Environment {
       color: this.config.theme.groundPatches,
       roughness: 1,
       transparent: true,
-      opacity: isDesert ? 0.38 : isLava ? 0.45 : 0.28,
+      opacity: isDesert ? 0.38 : isLava ? 0.45 : isCitadel || isCrystal ? 0.42 : 0.28,
     });
     for (let i = 0; i < 32; i += 1) {
       const angle = i * 2.399;
@@ -107,7 +115,7 @@ export class Environment {
       const patch = new THREE.Mesh(new THREE.CircleGeometry(2.6 + (i % 5) * 0.8, 7), patchMaterial);
       patch.rotation.x = -Math.PI / 2;
       patch.position.set(Math.cos(angle) * radius, 0.005, Math.sin(angle) * radius);
-      patch.scale.set(isDesert || isLava ? 2.2 : 1.7, 1, 0.65 + (i % 3) * 0.2);
+      patch.scale.set(isDesert || isLava || isCitadel ? 2.2 : 1.7, 1, 0.65 + (i % 3) * 0.2);
       patches.add(patch);
     }
     this.group.add(patches);
@@ -120,11 +128,13 @@ export class Environment {
     const isSakura = this.config.id === 'sakura';
     const isAtoll = this.config.id === 'atoll';
     const isAutumn = this.config.id === 'autumn';
+    const isCitadel = this.config.id === 'citadel';
+    const isCrystal = this.config.id === 'crystal';
     const group = new THREE.Group();
     const nearMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainNear, flatShading: true });
     const farMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainFar, flatShading: true });
 
-    // Layer 1: Mid-Distant Foothills / Mesas / Alpine Peaks / Volcanic Cones (Radius 220m - 270m)
+    // Layer 1: Mid-Distant Foothills / Mesas / Alpine Peaks / Volcanic Cones / Fortresses (Radius 220m - 270m)
     const nearCount = 22;
     for (let i = 0; i < nearCount; i += 1) {
       const angle = (i / nearCount) * Math.PI * 2 + (i % 3) * 0.08;
@@ -139,9 +149,13 @@ export class Environment {
         // Sandstone mesas and canyon buttes
         const topR = baseR * (0.42 + (i % 3) * 0.16);
         geom = new THREE.CylinderGeometry(topR, baseR, height, 6);
-      } else if (isSnow || isLava) {
-        // Alpine sharp jagged peaks or volcanic jagged calderas
+      } else if (isSnow || isLava || isCrystal) {
+        // Alpine sharp jagged peaks or crystalline sharp caverns
         geom = new THREE.ConeGeometry(baseR, height * 1.35, 4 + (i % 2));
+      } else if (isCitadel) {
+        // Fortress battlements and cylindrical bastion towers
+        const topR = baseR * 0.75;
+        geom = new THREE.CylinderGeometry(topR, baseR, height * 0.9, 8);
       } else if (isAtoll) {
         // Tropical ocean volcanic island cones
         geom = new THREE.ConeGeometry(baseR * 1.15, height * 0.85, 5 + (i % 2));
@@ -199,6 +213,8 @@ export class Environment {
     const isLava = this.config.id === 'lava';
     const isAutumn = this.config.id === 'autumn';
     const isSakura = this.config.id === 'sakura';
+    const isCitadel = this.config.id === 'citadel';
+    const isCrystal = this.config.id === 'crystal';
     const clouds = new THREE.Group();
     const cloudColor = isDesert
       ? 0xfff0dd
@@ -210,8 +226,12 @@ export class Environment {
             ? 0xffeed8
             : isSakura
               ? 0xfff0f6
-              : 0xffffff;
-    const cloudMat = new THREE.MeshBasicMaterial({ color: cloudColor, transparent: true, opacity: isLava ? 0.72 : 0.85 });
+              : isCitadel
+                ? 0xd4a896
+                : isCrystal
+                  ? 0x485888
+                  : 0xffffff;
+    const cloudMat = new THREE.MeshBasicMaterial({ color: cloudColor, transparent: true, opacity: isLava || isCrystal ? 0.72 : 0.85 });
 
     for (let i = 0; i < 14; i += 1) {
       const angle = (i / 14) * Math.PI * 2 + (i % 3) * 0.2;
@@ -1555,6 +1575,422 @@ export class Environment {
     const tablet = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.25), blackMat);
     tablet.position.set(0, 5.3, 0);
     arch.add(tablet);
+
+    this.group.add(arch);
+  }
+
+  // ==========================================
+  // 🏰 8. CITADEL (蒸汽古堡) SCENERY & PROPS
+  // ==========================================
+
+  private buildCitadelScenery(): void {
+    const group = new THREE.Group();
+    const trackSamples = this.track.samples;
+    const step = 7;
+
+    for (let i = 0; i < trackSamples.length; i += step) {
+      const sample = trackSamples[i];
+      const side = (i / step) % 2 === 0 ? -1 : 1;
+      const offset = 13 + (i % 4) * 2.5;
+      const pos = sample.position.clone().addScaledVector(sample.lateral, side * offset);
+      if (!this.isClearOfTrack(pos, 8.8)) continue;
+
+      if ((i / step) % 3 === 0) {
+        group.add(this.createRotatingGear(pos, 1.0 + (i % 3) * 0.2));
+      } else if ((i / step) % 3 === 1) {
+        group.add(this.createSteamPipe(pos, 1.0));
+      } else {
+        group.add(this.createGasLamp(pos, 1.0));
+      }
+    }
+
+    // Castle spires and large gears across infield/outfield
+    for (let i = 0; i < 28; i += 1) {
+      const angle = i * 2.35;
+      const radius = 22 + (i * 14) % 48;
+      const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 9.0)) continue;
+
+      if (i % 4 === 0) {
+        group.add(this.createCastleSpire(pos, 1.05 + (i % 3) * 0.15));
+      } else if (i % 2 === 0) {
+        group.add(this.createRotatingGear(pos, 1.2 + (i % 2) * 0.3));
+      } else {
+        group.add(this.createGasLamp(pos, 0.95));
+      }
+    }
+
+    this.group.add(group);
+  }
+
+  private createRotatingGear(position: THREE.Vector3, scale = 1): THREE.Group {
+    const gearGroup = new THREE.Group();
+    gearGroup.position.copy(position);
+    gearGroup.scale.setScalar(scale);
+
+    const brassMat = new THREE.MeshStandardMaterial({
+      color: COLORS.citadelBrass,
+      roughness: 0.45,
+      metalness: 0.75,
+      flatShading: true,
+    });
+    const ironMat = new THREE.MeshStandardMaterial({
+      color: 0x2e2826,
+      roughness: 0.7,
+      metalness: 0.8,
+      flatShading: true,
+    });
+
+    // Central axle
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 2.2, 8), ironMat);
+    axle.position.y = 1.1;
+    axle.castShadow = true;
+    gearGroup.add(axle);
+
+    // Main Gear Disk
+    const gear = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.35, 12), brassMat);
+    gear.position.y = 1.2;
+    gear.rotation.x = Math.PI / 4;
+    gear.castShadow = true;
+    gearGroup.add(gear);
+
+    // 8 Gear Teeth
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (i * Math.PI * 2) / 8;
+      const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.32, 0.5), brassMat);
+      tooth.position.set(Math.cos(angle) * 1.7, 1.2 + Math.sin(angle) * 0.2, Math.sin(angle) * 1.7);
+      tooth.rotation.y = -angle;
+      tooth.castShadow = true;
+      gearGroup.add(tooth);
+    }
+
+    return gearGroup;
+  }
+
+  private createSteamPipe(position: THREE.Vector3, scale = 1): THREE.Group {
+    const pipeGroup = new THREE.Group();
+    pipeGroup.position.copy(position);
+    pipeGroup.scale.setScalar(scale);
+
+    const copperMat = new THREE.MeshStandardMaterial({
+      color: COLORS.citadelCopper,
+      roughness: 0.4,
+      metalness: 0.82,
+      flatShading: true,
+    });
+    const ironMat = new THREE.MeshStandardMaterial({ color: 0x362f2c, roughness: 0.8, metalness: 0.6 });
+
+    // Vertical boiler
+    const boiler = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.95, 2.8, 8), ironMat);
+    boiler.position.y = 1.4;
+    boiler.castShadow = true;
+    pipeGroup.add(boiler);
+
+    // Copper pipeline
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3.2, 8), copperMat);
+    pipe.position.set(0.6, 2.2, 0);
+    pipe.rotation.z = Math.PI / 3;
+    pipe.castShadow = true;
+    pipeGroup.add(pipe);
+
+    // Pressure vent nozzle
+    const vent = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.8, 6), copperMat);
+    vent.position.set(1.6, 3.2, 0);
+    vent.castShadow = true;
+    pipeGroup.add(vent);
+
+    return pipeGroup;
+  }
+
+  private createCastleSpire(position: THREE.Vector3, scale = 1): THREE.Group {
+    const spire = new THREE.Group();
+    spire.position.copy(position);
+    spire.scale.setScalar(scale);
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: COLORS.citadelStone,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: COLORS.citadelRoof,
+      roughness: 0.6,
+      metalness: 0.4,
+      flatShading: true,
+    });
+
+    // Octagonal stone tower base
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 4.8, 8), stoneMat);
+    base.position.y = 2.4;
+    base.castShadow = true;
+    spire.add(base);
+
+    // Battlement rim
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.85, 1.6, 0.6, 8), stoneMat);
+    rim.position.y = 5.0;
+    rim.castShadow = true;
+    spire.add(rim);
+
+    // Conical copper spire roof
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.7, 3.4, 8), roofMat);
+    roof.position.y = 6.8;
+    roof.castShadow = true;
+    spire.add(roof);
+
+    return spire;
+  }
+
+  private createGasLamp(position: THREE.Vector3, scale = 1): THREE.Group {
+    const lamp = new THREE.Group();
+    lamp.position.copy(position);
+    lamp.scale.setScalar(scale);
+
+    const ironMat = new THREE.MeshStandardMaterial({ color: 0x221f1d, roughness: 0.7, metalness: 0.8 });
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xffbd59 });
+
+    // Lamp post
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 2.6, 6), ironMat);
+    post.position.y = 1.3;
+    post.castShadow = true;
+    lamp.add(post);
+
+    // Lantern box
+    const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.62, 0.48), ironMat);
+    lantern.position.y = 2.8;
+    lamp.add(lantern);
+
+    // Glowing core
+    const light = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.42, 0.32), glowMat);
+    light.position.y = 2.8;
+    lamp.add(light);
+
+    return lamp;
+  }
+
+  private buildCitadelStartArch(): void {
+    const sample = this.track.samples[0];
+    const arch = new THREE.Group();
+    const yaw = Math.atan2(sample.tangent.x, sample.tangent.z);
+    arch.position.copy(sample.position);
+    arch.rotation.y = yaw;
+
+    const stoneMat = new THREE.MeshStandardMaterial({ color: COLORS.citadelStone, roughness: 0.85, flatShading: true });
+    const brassMat = new THREE.MeshStandardMaterial({ color: COLORS.citadelBrass, roughness: 0.45, metalness: 0.75, flatShading: true });
+
+    // Stone fortress pillars
+    const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 6.0, 0.9), stoneMat);
+    leftPillar.position.set(-5.8, 3.0, 0);
+    leftPillar.castShadow = true;
+    arch.add(leftPillar);
+
+    const rightPillar = leftPillar.clone();
+    rightPillar.position.x = 5.8;
+    arch.add(rightPillar);
+
+    // Iron portcullis beam
+    const topBeam = new THREE.Mesh(new THREE.BoxGeometry(12.8, 0.9, 0.9), stoneMat);
+    topBeam.position.y = 5.6;
+    topBeam.castShadow = true;
+    arch.add(topBeam);
+
+    // Brass cog banner
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.7, 0.98), brassMat);
+    sign.position.set(0, 5.6, 0);
+    arch.add(sign);
+
+    this.group.add(arch);
+  }
+
+  // ==========================================
+  // 💎 9. CRYSTAL (水晶矿洞) SCENERY & PROPS
+  // ==========================================
+
+  private buildCrystalScenery(): void {
+    const group = new THREE.Group();
+    const trackSamples = this.track.samples;
+    const step = 7;
+
+    for (let i = 0; i < trackSamples.length; i += step) {
+      const sample = trackSamples[i];
+      const side = (i / step) % 2 === 0 ? -1 : 1;
+      const offset = 13 + (i % 4) * 2.5;
+      const pos = sample.position.clone().addScaledVector(sample.lateral, side * offset);
+      if (!this.isClearOfTrack(pos, 8.8)) continue;
+
+      if ((i / step) % 3 === 0) {
+        group.add(this.createMinecartShaft(pos, 1.0));
+      } else {
+        group.add(this.createCrystalCluster(pos, 0.95 + (i % 3) * 0.2, (i / step) % 2));
+      }
+    }
+
+    // Amethyst and aquamarine crystal formations across the cavern
+    for (let i = 0; i < 28; i += 1) {
+      const angle = i * 2.38;
+      const radius = 22 + (i * 15) % 48;
+      const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 9.0)) continue;
+
+      if (i % 4 === 0) {
+        group.add(this.createGlowRock(pos, 1.1));
+      } else if (i % 2 === 0) {
+        group.add(this.createCrystalCluster(pos, 1.25 + (i % 2) * 0.3, i % 2));
+      } else {
+        group.add(this.createMinecartShaft(pos, 0.9));
+      }
+    }
+
+    this.group.add(group);
+  }
+
+  private createCrystalCluster(position: THREE.Vector3, scale = 1, variant = 0): THREE.Group {
+    const cluster = new THREE.Group();
+    cluster.position.copy(position);
+    cluster.scale.setScalar(scale);
+
+    const isPurple = variant === 0;
+    const crystalMat = new THREE.MeshStandardMaterial({
+      color: isPurple ? COLORS.crystalPurple : COLORS.crystalCyan,
+      emissive: isPurple ? 0x6a18b8 : 0x1478b8,
+      emissiveIntensity: 1.6,
+      roughness: 0.15,
+      metalness: 0.3,
+      flatShading: true,
+    });
+    const rockMat = new THREE.MeshStandardMaterial({ color: COLORS.crystalCaveRock, roughness: 0.9, flatShading: true });
+
+    // Rock base
+    const base = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), rockMat);
+    base.position.y = 0.5;
+    base.scale.set(1.4, 0.8, 1.2);
+    base.castShadow = true;
+    cluster.add(base);
+
+    // Main towering hexagonal crystal
+    const main = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.7, 3.2, 6), crystalMat);
+    main.position.set(0, 1.9, 0);
+    main.rotation.z = 0.12;
+    main.castShadow = true;
+    cluster.add(main);
+
+    // Subsidiary side crystals
+    for (let i = 0; i < 3; i += 1) {
+      const angle = (i * Math.PI * 2) / 3 + 0.3;
+      const sub = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.45, 2.0, 6), crystalMat);
+      sub.position.set(Math.cos(angle) * 0.8, 1.2, Math.sin(angle) * 0.8);
+      sub.rotation.x = Math.sin(angle) * 0.35;
+      sub.rotation.z = Math.cos(angle) * 0.35;
+      sub.castShadow = true;
+      cluster.add(sub);
+    }
+
+    return cluster;
+  }
+
+  private createMinecartShaft(position: THREE.Vector3, scale = 1): THREE.Group {
+    const shaft = new THREE.Group();
+    shaft.position.copy(position);
+    shaft.scale.setScalar(scale);
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: COLORS.crystalWood, roughness: 0.85, flatShading: true });
+    const ironMat = new THREE.MeshStandardMaterial({ color: 0x3a4252, roughness: 0.6, metalness: 0.7 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd438, roughness: 0.3, metalness: 0.8, flatShading: true });
+
+    // Wooden timber frame
+    const leftPost = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.4, 0.3), woodMat);
+    leftPost.position.set(-1.1, 1.2, 0);
+    leftPost.castShadow = true;
+    shaft.add(leftPost);
+
+    const rightPost = leftPost.clone();
+    rightPost.position.x = 1.1;
+    shaft.add(rightPost);
+
+    const crossbeam = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.35, 0.35), woodMat);
+    crossbeam.position.y = 2.4;
+    crossbeam.castShadow = true;
+    shaft.add(crossbeam);
+
+    // Minecart body
+    const cart = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.65, 0.9), ironMat);
+    cart.position.set(0, 0.5, 0.3);
+    cart.castShadow = true;
+    shaft.add(cart);
+
+    // Gold nuggets in cart
+    for (let i = 0; i < 3; i += 1) {
+      const nugget = new THREE.Mesh(new THREE.DodecahedronGeometry(0.2, 0), goldMat);
+      nugget.position.set(-0.3 + i * 0.3, 0.85, 0.3);
+      shaft.add(nugget);
+    }
+
+    return shaft;
+  }
+
+  private createGlowRock(position: THREE.Vector3, scale = 1): THREE.Group {
+    const group = new THREE.Group();
+    group.position.copy(position);
+    group.scale.setScalar(scale);
+
+    const rockMat = new THREE.MeshStandardMaterial({ color: COLORS.crystalCaveRock, roughness: 0.92, flatShading: true });
+    const crystalMat = new THREE.MeshStandardMaterial({
+      color: COLORS.crystalCyan,
+      emissive: 0x1478b8,
+      emissiveIntensity: 1.8,
+      roughness: 0.2,
+      metalness: 0.3,
+    });
+
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), rockMat);
+    rock.position.y = 0.8;
+    rock.scale.set(1.3, 1.2, 1.4);
+    rock.castShadow = true;
+    group.add(rock);
+
+    // Small glowing shard on top
+    const shard = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.9, 6), crystalMat);
+    shard.position.set(0.3, 1.8, 0.2);
+    shard.rotation.z = 0.2;
+    group.add(shard);
+
+    return group;
+  }
+
+  private buildCrystalStartArch(): void {
+    const sample = this.track.samples[0];
+    const arch = new THREE.Group();
+    const yaw = Math.atan2(sample.tangent.x, sample.tangent.z);
+    arch.position.copy(sample.position);
+    arch.rotation.y = yaw;
+
+    const rockMat = new THREE.MeshStandardMaterial({ color: COLORS.crystalCaveRock, roughness: 0.88, flatShading: true });
+    const crystalBannerMat = new THREE.MeshStandardMaterial({
+      color: COLORS.crystalPurple,
+      emissive: 0x6a18b8,
+      emissiveIntensity: 1.8,
+      roughness: 0.2,
+    });
+
+    // Stalagmite cavern pillars
+    const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 6.0, 7), rockMat);
+    leftPillar.position.set(-5.8, 3.0, 0);
+    leftPillar.castShadow = true;
+    arch.add(leftPillar);
+
+    const rightPillar = leftPillar.clone();
+    rightPillar.position.x = 5.8;
+    arch.add(rightPillar);
+
+    // Cavern lintel beam
+    const topBeam = new THREE.Mesh(new THREE.BoxGeometry(12.8, 0.95, 0.95), rockMat);
+    topBeam.position.y = 5.6;
+    topBeam.castShadow = true;
+    arch.add(topBeam);
+
+    // Luminous crystal sign
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.7, 1.02), crystalBannerMat);
+    sign.position.set(0, 5.6, 0);
+    arch.add(sign);
 
     this.group.add(arch);
   }

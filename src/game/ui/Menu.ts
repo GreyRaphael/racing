@@ -10,9 +10,11 @@ const TRACK_EYEBROWS: Record<TrackId, string> = {
   autumn: 'MAPLE VALLEY CIRCUIT',
   lava: 'MAGMA CALDERA CIRCUIT',
   sakura: 'CHERRY SAKURA CIRCUIT',
+  citadel: 'CLOCKWORK CITADEL CIRCUIT',
+  crystal: 'CRYSTAL CAVERNS CIRCUIT',
 };
 
-const ALL_TRACK_IDS: TrackId[] = ['meadow', 'desert', 'snow', 'atoll', 'autumn', 'lava', 'sakura'];
+const ALL_TRACK_IDS: TrackId[] = ['meadow', 'desert', 'snow', 'atoll', 'autumn', 'lava', 'sakura', 'citadel', 'crystal'];
 
 export class Menu {
   private readonly root = this.require<HTMLElement>('#menu-screen');

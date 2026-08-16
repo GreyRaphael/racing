@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 
-export type TrackName = 'meadow' | 'desert' | 'snow' | 'atoll' | 'autumn' | 'lava' | 'sakura';
+export type TrackName = 'meadow' | 'desert' | 'snow' | 'atoll' | 'autumn' | 'lava' | 'sakura' | 'citadel' | 'crystal';
 
 export async function startMode(
   page: Page,

@@ -42,6 +42,8 @@ h2 { font-size: 54px; line-height: .9; color: #234957; }
 #track-autumn.selected { border-color: #d97d26; background: #fff3e6; box-shadow: inset 4px 0 0 #d97d26; }
 #track-lava.selected { border-color: #d84428; background: #fbeee8; box-shadow: inset 4px 0 0 #d84428; }
 #track-sakura.selected { border-color: #e26895; background: #fdf0f5; box-shadow: inset 4px 0 0 #e26895; }
+#track-citadel.selected { border-color: #d48438; background: #fdf3e8; box-shadow: inset 4px 0 0 #d48438; }
+#track-crystal.selected { border-color: #9b48e2; background: #f6eefc; box-shadow: inset 4px 0 0 #9b48e2; }
 .track-button strong, .track-button small { display: block; }
 .track-button strong { color: #284e54; font-size: 13px; }
 .track-button small { margin-top: 1px; font-size: 9.5px; color: #88a09a; }
