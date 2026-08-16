@@ -157,8 +157,13 @@ export class Track {
     const edgePositions: number[] = [];
     const edgeNormals: number[] = [];
     const edgeIndices: number[] = [];
+    const skirtPositions: number[] = [];
+    const skirtNormals: number[] = [];
+    const skirtIndices: number[] = [];
     const half = this.roadHalfWidth;
     const edgeWidth = 0.28;
+    const skirtWidth = 0.75;
+    const skirtDrop = 0.26;
 
     for (let i = 0; i < this.samples.length; i += 1) {
       const sample = this.samples[i];
@@ -166,12 +171,14 @@ export class Track {
       const right = sample.position.clone().addScaledVector(sample.lateral, half);
       const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth));
       const rightEdge = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth);
+      const leftSkirt = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth + skirtWidth));
+      const rightSkirt = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth + skirtWidth);
       const normal = sample.lateral.clone().cross(sample.tangent).normalize();
 
-      // 1. Road surface
+      // 1. Road surface (elevated 8cm above datum)
       roadPositions.push(
-        left.x, left.y + 0.04, left.z,
-        right.x, right.y + 0.04, right.z,
+        left.x, left.y + 0.08, left.z,
+        right.x, right.y + 0.08, right.z,
       );
       roadNormals.push(
         normal.x, normal.y, normal.z,
@@ -183,10 +190,10 @@ export class Track {
 
       // 2. Curb edges
       edgePositions.push(
-        leftEdge.x, leftEdge.y + 0.055, leftEdge.z,
-        left.x, left.y + 0.058, left.z,
-        right.x, right.y + 0.058, right.z,
-        rightEdge.x, rightEdge.y + 0.055, rightEdge.z,
+        leftEdge.x, leftEdge.y + 0.095, leftEdge.z,
+        left.x, left.y + 0.10, left.z,
+        right.x, right.y + 0.10, right.z,
+        rightEdge.x, rightEdge.y + 0.095, rightEdge.z,
       );
       edgeNormals.push(
         normal.x, normal.y, normal.z,
@@ -198,6 +205,24 @@ export class Track {
       const edgeNext = ((i + 1) % this.samples.length) * 4;
       edgeIndices.push(edgeBase, edgeBase + 1, edgeNext, edgeBase + 1, edgeNext + 1, edgeNext);
       edgeIndices.push(edgeBase + 2, edgeBase + 3, edgeNext + 2, edgeBase + 3, edgeNext + 3, edgeNext + 2);
+
+      // 3. Embankment Skirt (drops down into terrain)
+      skirtPositions.push(
+        leftSkirt.x, leftSkirt.y - skirtDrop, leftSkirt.z,
+        leftEdge.x, leftEdge.y + 0.095, leftEdge.z,
+        rightEdge.x, rightEdge.y + 0.095, rightEdge.z,
+        rightSkirt.x, rightSkirt.y - skirtDrop, rightSkirt.z,
+      );
+      skirtNormals.push(
+        normal.x, normal.y, normal.z,
+        normal.x, normal.y, normal.z,
+        normal.x, normal.y, normal.z,
+        normal.x, normal.y, normal.z,
+      );
+      const skirtBase = i * 4;
+      const skirtNext = ((i + 1) % this.samples.length) * 4;
+      skirtIndices.push(skirtBase, skirtBase + 1, skirtNext, skirtBase + 1, skirtNext + 1, skirtNext);
+      skirtIndices.push(skirtBase + 2, skirtBase + 3, skirtNext + 2, skirtBase + 3, skirtNext + 3, skirtNext + 2);
     }
 
     const roadGeometry = new THREE.BufferGeometry();
@@ -231,6 +256,21 @@ export class Track {
     edge.receiveShadow = true;
     this.group.add(edge);
 
+    const skirtGeometry = new THREE.BufferGeometry();
+    skirtGeometry.setAttribute('position', new THREE.Float32BufferAttribute(skirtPositions, 3));
+    skirtGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(skirtNormals, 3));
+    skirtGeometry.setIndex(skirtIndices);
+    const skirt = new THREE.Mesh(
+      skirtGeometry,
+      new THREE.MeshStandardMaterial({
+        color: this.config.theme.roadEdge,
+        roughness: 0.9,
+        side: THREE.DoubleSide,
+      }),
+    );
+    skirt.receiveShadow = true;
+    this.group.add(skirt);
+
     this.buildCenterMarkers();
     this.buildGuardRails();
   }
@@ -240,7 +280,7 @@ export class Track {
     for (let i = 8; i < this.samples.length; i += 18) {
       const sample = this.samples[i];
       const marker = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 1.5), markerMaterial);
-      marker.position.copy(sample.position).add(new THREE.Vector3(0, 0.07, 0));
+      marker.position.copy(sample.position).add(new THREE.Vector3(0, 0.11, 0));
       marker.rotation.y = Math.atan2(sample.tangent.x, sample.tangent.z);
       this.group.add(marker);
     }
@@ -251,7 +291,7 @@ export class Track {
         new THREE.BoxGeometry(1.15, 0.035, 1.4),
         new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xfaf7e9 : this.config.theme.fencePost, roughness: 0.75 }),
       );
-      tile.position.copy(startSample.position).addScaledVector(startSample.lateral, i * 1.13).add(new THREE.Vector3(0, 0.09, 0));
+      tile.position.copy(startSample.position).addScaledVector(startSample.lateral, i * 1.13).add(new THREE.Vector3(0, 0.12, 0));
       tile.rotation.y = Math.atan2(startSample.tangent.x, startSample.tangent.z);
       this.group.add(tile);
     }

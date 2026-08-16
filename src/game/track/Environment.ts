@@ -76,20 +76,34 @@ export class Environment {
   getTerrainHeight(x: number, z: number): number {
     const query = this.track.getNearest(new THREE.Vector3(x, 0, z));
     const trackY = query.sample.position.y;
-    if (trackY <= 0.01) return 0;
-
     const d = Math.abs(query.lateralOffset);
-    const shoulderWidth = this.track.roadHalfWidth + 1.2;
-    if (d <= shoulderWidth) {
-      return Math.max(0, trackY - 0.03);
+    const roadBoundary = this.track.roadHalfWidth + 1.2;
+
+    // 1. Direct road corridor: ground sits safely 20cm below track datum so terrain triangles can NEVER cover the road
+    if (d <= roadBoundary) {
+      return Math.max(0, trackY - 0.20);
     }
-    const maxSlopeDist = 28.0;
+
+    if (trackY <= 0.01) {
+      return 0;
+    }
+
+    // 2. Rolling hills alongside the track: rise gently in the verge, then decay smoothly to base elevation
+    const hillPeakDist = 9.0;
+    const maxSlopeDist = 24.0;
     if (d >= maxSlopeDist) {
       return 0;
     }
-    const t = (d - shoulderWidth) / (maxSlopeDist - shoulderWidth);
+
+    if (d <= hillPeakDist) {
+      const t = (d - roadBoundary) / (hillPeakDist - roadBoundary);
+      const smoothT = Math.sin(t * Math.PI * 0.5);
+      return Math.max(0, (trackY - 0.20) + 0.20 * smoothT);
+    }
+
+    const t = (d - hillPeakDist) / (maxSlopeDist - hillPeakDist);
     const weight = Math.cos(t * Math.PI * 0.5);
-    return Math.max(0, (trackY - 0.03) * weight * weight);
+    return Math.max(0, trackY * weight * weight);
   }
 
   private buildGround(): void {
@@ -134,7 +148,7 @@ export class Environment {
     outerGround.castShadow = false;
     this.group.add(outerGround);
 
-    // 3. Ground detail color patches snapped to 3D terrain
+    // 3. Ground detail color patches snapped to 3D terrain (strictly clear of track)
     const patches = new THREE.Group();
     const patchMaterial = new THREE.MeshStandardMaterial({
       color: this.config.theme.groundPatches,
@@ -142,13 +156,14 @@ export class Environment {
       transparent: true,
       opacity: isDesert ? 0.38 : isLava ? 0.45 : isCitadel || isCrystal ? 0.42 : 0.28,
     });
-    for (let i = 0; i < 32; i += 1) {
+    for (let i = 0; i < 48; i += 1) {
       const angle = i * 2.399;
-      const radius = 13 + (i * 17) % 58;
+      const radius = 14 + (i * 17) % 58;
       const px = Math.cos(angle) * radius;
       const pz = Math.sin(angle) * radius;
+      if (!this.isClearOfTrack(new THREE.Vector3(px, 0, pz), this.track.roadHalfWidth + 4.5)) continue;
       const py = this.getTerrainHeight(px, pz) + 0.015;
-      const patch = new THREE.Mesh(new THREE.CircleGeometry(2.6 + (i % 5) * 0.8, 7), patchMaterial);
+      const patch = new THREE.Mesh(new THREE.CircleGeometry(2.6 + (i % 5) * 0.8, 16), patchMaterial);
       patch.rotation.x = -Math.PI / 2;
       patch.position.set(px, py, pz);
       patch.scale.set(isDesert || isLava || isCitadel ? 2.2 : 1.7, 1, 0.65 + (i % 3) * 0.2);

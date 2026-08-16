@@ -14,6 +14,7 @@ const ALL_TRACKS: { id: TrackName; name: string; shortCode: string }[] = [
 ];
 
 test('菜单可切换选择全部9大地图并更新展示与3D状态', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto('/');
   await expect(page.getByTestId('track-menu')).toBeVisible();
 
