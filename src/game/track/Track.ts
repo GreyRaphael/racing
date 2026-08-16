@@ -47,12 +47,13 @@ export class Track {
     return { position, tangent, lateral, progress: wrapped, distance };
   }
 
-  getPose(progress: number, lateralOffset = 0): { position: THREE.Vector3; tangent: THREE.Vector3; yaw: number } {
+  getPose(progress: number, lateralOffset = 0): { position: THREE.Vector3; tangent: THREE.Vector3; yaw: number; pitch: number } {
     const sample = this.getSampleAtProgress(progress);
     const position = sample.position.clone().addScaledVector(sample.lateral, lateralOffset);
     // Kart visuals point along local -Z, so this yaw makes their nose follow the tangent.
     const yaw = Math.atan2(-sample.tangent.x, -sample.tangent.z);
-    return { position, tangent: sample.tangent, yaw };
+    const pitch = Math.atan2(sample.tangent.y, Math.hypot(sample.tangent.x, sample.tangent.z));
+    return { position, tangent: sample.tangent, yaw, pitch };
   }
 
   getNearest(position: THREE.Vector3): TrackQuery {
@@ -107,7 +108,11 @@ export class Track {
     const ua = ((p4.x - p3.x) * (p1.z - p3.z) - (p4.z - p3.z) * (p1.x - p3.x)) / denom;
     const ub = ((p2.x - p1.x) * (p1.z - p3.z) - (p2.z - p1.z) * (p1.x - p3.x)) / denom;
     if (ua >= -0.02 && ua <= 1.02 && ub >= -0.02 && ub <= 1.02) {
-      return new THREE.Vector3(p1.x + ua * (p2.x - p1.x), 0, p1.z + ua * (p2.z - p1.z));
+      return new THREE.Vector3(
+        p1.x + ua * (p2.x - p1.x),
+        p1.y + ua * (p2.y - p1.y),
+        p1.z + ua * (p2.z - p1.z),
+      );
     }
     return null;
   }
@@ -150,61 +155,71 @@ export class Track {
     const roadIndices: number[] = [];
     const edgePositions: number[] = [];
     const edgeIndices: number[] = [];
+    const deckPositions: number[] = [];
+    const deckIndices: number[] = [];
     const half = this.roadHalfWidth;
     const edgeWidth = 0.28;
+    const skirtDepth = 0.36;
 
     for (let i = 0; i < this.samples.length; i += 1) {
       const sample = this.samples[i];
       const left = sample.position.clone().addScaledVector(sample.lateral, -half);
       const right = sample.position.clone().addScaledVector(sample.lateral, half);
-      roadPositions.push(left.x, 0.04, left.z, right.x, 0.04, right.z);
+      const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth));
+      const rightEdge = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth);
 
+      // 1. Road surface
+      roadPositions.push(
+        left.x, left.y + 0.04, left.z,
+        right.x, right.y + 0.04, right.z,
+      );
       const base = i * 2;
       const nextBase = ((i + 1) % this.samples.length) * 2;
       roadIndices.push(base, base + 1, nextBase, base + 1, nextBase + 1, nextBase);
-      const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth));
-      const rightEdge = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth);
+
+      // 2. Curb edges
       edgePositions.push(
-        leftEdge.x, 0.055, leftEdge.z,
-        left.x, 0.058, left.z,
-        right.x, 0.058, right.z,
-        rightEdge.x, 0.055, rightEdge.z,
+        leftEdge.x, leftEdge.y + 0.055, leftEdge.z,
+        left.x, left.y + 0.058, left.z,
+        right.x, right.y + 0.058, right.z,
+        rightEdge.x, rightEdge.y + 0.055, rightEdge.z,
       );
       const edgeBase = i * 4;
       const edgeNext = ((i + 1) % this.samples.length) * 4;
       edgeIndices.push(edgeBase, edgeBase + 1, edgeNext, edgeBase + 1, edgeNext + 1, edgeNext);
       edgeIndices.push(edgeBase + 2, edgeBase + 3, edgeNext + 2, edgeBase + 3, edgeNext + 3, edgeNext + 2);
+
+      // 3. Side skirts and underside bridge deck
+      deckPositions.push(
+        leftEdge.x, leftEdge.y + 0.05, leftEdge.z,
+        leftEdge.x, leftEdge.y - skirtDepth, leftEdge.z,
+        rightEdge.x, rightEdge.y - skirtDepth, rightEdge.z,
+        rightEdge.x, rightEdge.y + 0.05, rightEdge.z,
+      );
+      const deckBase = i * 4;
+      const deckNext = ((i + 1) % this.samples.length) * 4;
+      // Left outer skirt
+      deckIndices.push(deckBase, deckNext, deckBase + 1, deckBase + 1, deckNext, deckNext + 1);
+      // Right outer skirt
+      deckIndices.push(deckBase + 2, deckNext + 2, deckBase + 3, deckBase + 3, deckNext + 2, deckNext + 3);
+      // Underside bottom slab
+      deckIndices.push(deckBase + 1, deckNext + 1, deckBase + 2, deckBase + 2, deckNext + 1, deckNext + 2);
     }
 
     const roadGeometry = new THREE.BufferGeometry();
     roadGeometry.setAttribute('position', new THREE.Float32BufferAttribute(roadPositions, 3));
-    const roadNormals = new Float32Array(roadPositions.length);
-    for (let i = 0; i < roadPositions.length; i += 3) {
-      roadNormals[i] = 0;
-      roadNormals[i + 1] = 1;
-      roadNormals[i + 2] = 0;
-    }
-    roadGeometry.setAttribute('normal', new THREE.BufferAttribute(roadNormals, 3));
+    roadGeometry.computeVertexNormals();
     roadGeometry.setIndex(roadIndices);
-    const roadMaterial = new THREE.MeshStandardMaterial({
-      color: this.config.theme.road,
-      roughness: 0.88,
-      metalness: 0,
-      side: THREE.FrontSide,
-    });
-    const road = new THREE.Mesh(roadGeometry, roadMaterial);
+    const road = new THREE.Mesh(
+      roadGeometry,
+      new THREE.MeshStandardMaterial({ color: this.config.theme.road, roughness: 0.88, side: THREE.FrontSide }),
+    );
     road.receiveShadow = true;
     this.group.add(road);
 
     const edgeGeometry = new THREE.BufferGeometry();
     edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
-    const edgeNormals = new Float32Array(edgePositions.length);
-    for (let i = 0; i < edgePositions.length; i += 3) {
-      edgeNormals[i] = 0;
-      edgeNormals[i + 1] = 1;
-      edgeNormals[i + 2] = 0;
-    }
-    edgeGeometry.setAttribute('normal', new THREE.BufferAttribute(edgeNormals, 3));
+    edgeGeometry.computeVertexNormals();
     edgeGeometry.setIndex(edgeIndices);
     const edge = new THREE.Mesh(
       edgeGeometry,
@@ -213,17 +228,73 @@ export class Track {
     edge.receiveShadow = true;
     this.group.add(edge);
 
+    const deckGeometry = new THREE.BufferGeometry();
+    deckGeometry.setAttribute('position', new THREE.Float32BufferAttribute(deckPositions, 3));
+    deckGeometry.computeVertexNormals();
+    deckGeometry.setIndex(deckIndices);
+    const deck = new THREE.Mesh(
+      deckGeometry,
+      new THREE.MeshStandardMaterial({ color: this.config.theme.fencePost, roughness: 0.85, metalness: 0.1, side: THREE.DoubleSide }),
+    );
+    deck.castShadow = true;
+    deck.receiveShadow = true;
+    this.group.add(deck);
+
+    this.buildBridgePillars();
     this.buildCenterMarkers();
     this.buildGuardRails();
+  }
+
+  private buildBridgePillars(): void {
+    const pillarMaterial = new THREE.MeshStandardMaterial({
+      color: this.config.theme.fencePost,
+      roughness: 0.8,
+      flatShading: true,
+    });
+    const beamMaterial = new THREE.MeshStandardMaterial({
+      color: this.config.theme.fenceCap,
+      roughness: 0.7,
+      flatShading: true,
+    });
+
+    const step = 8;
+    for (let i = 0; i < this.samples.length; i += step) {
+      const sample = this.samples[i];
+      if (sample.position.y <= 1.4) continue;
+
+      const height = sample.position.y - 0.2;
+      const leftPos = sample.position.clone().addScaledVector(sample.lateral, -this.roadHalfWidth - 0.1);
+      const rightPos = sample.position.clone().addScaledVector(sample.lateral, this.roadHalfWidth + 0.1);
+
+      // Left support pillar
+      const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, height, 7), pillarMaterial);
+      leftPillar.position.set(leftPos.x, height / 2, leftPos.z);
+      leftPillar.castShadow = true;
+      leftPillar.receiveShadow = true;
+      this.group.add(leftPillar);
+
+      // Right support pillar
+      const rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, height, 7), pillarMaterial);
+      rightPillar.position.set(rightPos.x, height / 2, rightPos.z);
+      rightPillar.castShadow = true;
+      rightPillar.receiveShadow = true;
+      this.group.add(rightPillar);
+
+      // Cross girder beam connecting the pillars directly under the deck
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(this.roadHalfWidth * 2 + 0.8, 0.45, 0.8), beamMaterial);
+      beam.position.copy(sample.position).add(new THREE.Vector3(0, -0.32, 0));
+      beam.rotation.y = Math.atan2(sample.tangent.x, sample.tangent.z);
+      beam.castShadow = true;
+      this.group.add(beam);
+    }
   }
 
   private buildCenterMarkers(): void {
     const markerMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.marker, roughness: 0.8 });
     for (let i = 8; i < this.samples.length; i += 18) {
       const sample = this.samples[i];
-      const marker = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 1.5), markerMaterial);
-      marker.position.copy(sample.position).setY(0.07);
-      // The marker depth is local +Z, unlike the kart nose.
+      const marker = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 1.5), markerMaterial);
+      marker.position.copy(sample.position).add(new THREE.Vector3(0, 0.07, 0));
       marker.rotation.y = Math.atan2(sample.tangent.x, sample.tangent.z);
       this.group.add(marker);
     }
@@ -234,7 +305,7 @@ export class Track {
         new THREE.BoxGeometry(1.15, 0.035, 1.4),
         new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xfaf7e9 : this.config.theme.fencePost, roughness: 0.75 }),
       );
-      tile.position.copy(startSample.position).addScaledVector(startSample.lateral, i * 1.13).setY(0.09);
+      tile.position.copy(startSample.position).addScaledVector(startSample.lateral, i * 1.13).add(new THREE.Vector3(0, 0.09, 0));
       tile.rotation.y = Math.atan2(startSample.tangent.x, startSample.tangent.z);
       this.group.add(tile);
     }
@@ -281,24 +352,25 @@ export class Track {
         const segment = nextPostPosition.clone().sub(postPosition);
         const midpoint = postPosition.clone().lerp(nextPostPosition, 0.5);
         const railYaw = Math.atan2(segment.x, segment.z);
+        const railPitch = Math.atan2(-segment.y, Math.hypot(segment.x, segment.z));
 
-        transform.position.copy(postPosition).setY(0.54);
+        transform.position.copy(postPosition).add(new THREE.Vector3(0, 0.54, 0));
         transform.rotation.set(0, 0, 0);
         transform.scale.setScalar(1);
         transform.updateMatrix();
         posts.setMatrixAt(instance, transform.matrix);
 
-        transform.position.copy(postPosition).setY(1.12);
+        transform.position.copy(postPosition).add(new THREE.Vector3(0, 1.12, 0));
         transform.updateMatrix();
         caps.setMatrixAt(instance, transform.matrix);
 
-        transform.position.copy(midpoint).setY(0.82);
-        transform.rotation.set(0, railYaw, 0);
+        transform.position.copy(midpoint).add(new THREE.Vector3(0, 0.82, 0));
+        transform.rotation.set(railPitch, railYaw, 0, 'YXZ');
         transform.scale.set(1, 1, segment.length() + 0.12);
         transform.updateMatrix();
         upperRails.setMatrixAt(instance, transform.matrix);
 
-        transform.position.copy(midpoint).setY(0.48);
+        transform.position.copy(midpoint).add(new THREE.Vector3(0, 0.48, 0));
         transform.scale.set(1, 1, segment.length() + 0.12);
         transform.updateMatrix();
         lowerRails.setMatrixAt(instance, transform.matrix);

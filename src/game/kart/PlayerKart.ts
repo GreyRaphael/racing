@@ -16,8 +16,9 @@ export class PlayerKart extends Kart {
     this.isDrifting = canDrive && input.drift && (Math.abs(this.speed) > 0.15 || Math.abs(steerInput) > 0);
 
     if (!canDrive) {
-      this.speed = Math.max(0, this.speed - delta * 7);
+      this.speed = 0;
       this.integrate(delta);
+      this.speed = 0;
       this.updateTrackQuery();
       return;
     }
@@ -36,7 +37,7 @@ export class PlayerKart extends Kart {
     } else {
       this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), resistance * delta * 0.25);
     }
-    this.speed = clamp(this.speed, -8, 25);
+    this.speed = clamp(this.speed, -8, 28);
     this.integrate(delta);
     this.updateTrackQuery();
   }

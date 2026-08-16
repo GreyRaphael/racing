@@ -7,6 +7,7 @@ export interface KartDebugState {
   speed: number;
   position: { x: number; y: number; z: number };
   yaw: number;
+  pitch: number;
   steering: number;
   progress: number;
   lateralOffset: number;
@@ -25,6 +26,7 @@ export class Kart {
   readonly color: number;
   speed = 0;
   yaw = 0;
+  pitch = 0;
   steering = 0;
   progress = 0;
   lateralOffset = 0;
@@ -82,8 +84,9 @@ export class Kart {
 
   placeAt(progress: number, lateralOffset = 0): void {
     const pose = this.track.getPose(progress, lateralOffset);
-    this.position.copy(pose.position).setY(0.23);
+    this.position.copy(pose.position).add(new THREE.Vector3(0, 0.23, 0));
     this.yaw = pose.yaw;
+    this.pitch = pose.pitch;
     this.progress = progress;
     this.lateralOffset = lateralOffset;
     this.updateVisual(0);
@@ -107,6 +110,21 @@ export class Kart {
   integrate(delta: number): void {
     this.position.addScaledVector(this.getForward(), this.speed * delta);
     this.position.addScaledVector(this.getRight(), this.lateralVelocity * delta);
+
+    // Smoothly adhere to 3D track elevation and update pitch tilt
+    const currentSample = this.track.getSampleAtProgress(this.progress);
+    const targetY = currentSample.position.y + 0.23;
+    this.position.y = damp(this.position.y, targetY, 20, delta);
+
+    const targetPitch = Math.atan2(currentSample.tangent.y, Math.hypot(currentSample.tangent.x, currentSample.tangent.z));
+    this.pitch = damp(this.pitch, targetPitch, 14, delta);
+
+    // Slope gravity acceleration: downhill gives acceleration, uphill adds resistance (static friction holds parked karts)
+    if (Math.abs(this.speed) > 0.05) {
+      const slopeAccel = -16.0 * Math.sin(this.pitch);
+      this.speed += slopeAccel * delta;
+    }
+
     // Positive steering means right. With a local -Z nose, right-turning
     // decreases the Three.js Y rotation.
     this.yaw -= this.steering * (0.45 + Math.min(1, Math.abs(this.speed) / 15) * 1.2) * delta;
@@ -150,7 +168,7 @@ export class Kart {
   }
 
   updateVisual(delta: number): void {
-    this.group.rotation.y = this.yaw;
+    this.group.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     const targetLean = -this.steering * Math.min(0.08, Math.abs(this.speed) * 0.006);
     this.group.rotation.z = damp(this.group.rotation.z, targetLean, 8, Math.max(0.001, delta));
     for (const wheel of this.wheelMeshes) wheel.rotation.x -= this.speed * Math.max(0.001, delta) * 1.5;
@@ -163,6 +181,7 @@ export class Kart {
       speed: this.speed,
       position: { x: this.position.x, y: this.position.y, z: this.position.z },
       yaw: this.yaw,
+      pitch: this.pitch,
       steering: this.steering,
       progress: this.progress,
       lateralOffset: this.lateralOffset,

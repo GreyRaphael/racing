@@ -44,7 +44,7 @@ export class CollisionSystem {
         const side = Math.sign(query.lateralOffset || 1);
         const outward = query.sample.lateral.clone().multiplyScalar(side);
         const safeOffset = side * (this.track.fenceLimit - 0.15);
-        kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, safeOffset).setY(0.23);
+        kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, safeOffset).add(new THREE.Vector3(0, 0.23, 0));
 
         // Reflect the world velocity against the wall normal while retaining
         // tangential speed. This produces a soft, angled bounce instead of a
@@ -127,8 +127,9 @@ export class CollisionSystem {
     const query = this.track.getNearest(kart.position);
     kart.destroyed = false;
     kart.group.visible = true;
-    kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, 0).setY(0.23);
+    kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, 0).add(new THREE.Vector3(0, 0.23, 0));
     kart.yaw = Math.atan2(-query.sample.tangent.x, -query.sample.tangent.z);
+    kart.pitch = Math.atan2(query.sample.tangent.y, Math.hypot(query.sample.tangent.x, query.sample.tangent.z));
     kart.speed = 0;
     kart.lateralVelocity = 0;
     kart.steering = 0;
@@ -138,7 +139,7 @@ export class CollisionSystem {
   forceToOffset(kart: Kart, lateralOffset: number): void {
     const query = this.track.getNearest(kart.position);
     const safeOffset = clamp(lateralOffset, -this.track.fenceLimit * 1.8, this.track.fenceLimit * 1.8);
-    kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, safeOffset).setY(0.23);
+    kart.position.copy(query.sample.position).addScaledVector(query.sample.lateral, safeOffset).add(new THREE.Vector3(0, 0.23, 0));
     kart.updateTrackQuery();
   }
 

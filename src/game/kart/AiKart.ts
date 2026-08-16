@@ -21,8 +21,9 @@ export class AiKart extends Kart {
     }
     if (!canDrive || this.finished) {
       this.steering = 0;
-      this.speed = Math.max(0, this.speed - delta * 3);
+      this.speed = 0;
       this.integrate(delta);
+      this.speed = 0;
       this.updateTrackQuery();
       return;
     }
