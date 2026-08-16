@@ -101,37 +101,48 @@ export class Track {
     }
   }
 
-  private computeSideOffsets(side: number, defaultOffset: number, minOffset: number, scaleFactor: number): Float32Array {
-    const raw = new Float32Array(this.samples.length);
-    for (let i = 0; i < this.samples.length; i += 1) {
-      const sample = this.samples[i];
-      const prev = this.samples[(i - 1 + this.samples.length) % this.samples.length];
-      const next = this.samples[(i + 1) % this.samples.length];
-      const ds = (prev.position.distanceTo(sample.position) + sample.position.distanceTo(next.position)) / 2;
-      const dTan = next.tangent.clone().sub(prev.tangent).length() / Math.max(1e-4, ds * 2);
-      const turnDir = Math.sign(prev.tangent.x * next.tangent.z - prev.tangent.z * next.tangent.x);
-
-      let offset = defaultOffset;
-      const isInside = side * turnDir > 0;
-      if (isInside && dTan > 0.02) {
-        offset = Math.max(minOffset, Math.min(defaultOffset, (1 / dTan) * scaleFactor));
-      }
-      raw[i] = offset;
+  private intersect2D(p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3, p4: THREE.Vector3): THREE.Vector3 | null {
+    const denom = (p4.z - p3.z) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.z - p1.z);
+    if (Math.abs(denom) < 1e-5) return null;
+    const ua = ((p4.x - p3.x) * (p1.z - p3.z) - (p4.z - p3.z) * (p1.x - p3.x)) / denom;
+    const ub = ((p2.x - p1.x) * (p1.z - p3.z) - (p2.z - p1.z) * (p1.x - p3.x)) / denom;
+    if (ua >= -0.02 && ua <= 1.02 && ub >= -0.02 && ub <= 1.02) {
+      return new THREE.Vector3(p1.x + ua * (p2.x - p1.x), 0, p1.z + ua * (p2.z - p1.z));
     }
+    return null;
+  }
 
-    const smoothed = new Float32Array(this.samples.length);
-    const window = 8;
-    for (let i = 0; i < this.samples.length; i += 1) {
-      let minVal = defaultOffset;
-      for (let w = -window; w <= window; w += 1) {
-        const idx = (i + w + this.samples.length) % this.samples.length;
-        const dist = Math.abs(w);
-        const weight = 1 + dist * 0.22;
-        minVal = Math.min(minVal, raw[idx] * weight);
+  private untangleFencePolyline(rawPoints: THREE.Vector3[], maxStep = 14): THREE.Vector3[] {
+    const points = rawPoints.map((p) => p.clone());
+    let changed = true;
+    let iter = 0;
+    while (changed && iter < 8) {
+      changed = false;
+      iter += 1;
+      const n = points.length;
+      for (let i = 0; i < n; i += 1) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % n];
+        for (let s = 2; s <= maxStep; s += 1) {
+          const j = (i + s) % n;
+          const p3 = points[j];
+          const p4 = points[(j + 1) % n];
+          const hit = this.intersect2D(p1, p2, p3, p4);
+          if (hit) {
+            if (j > i) {
+              points.splice(i + 1, j - i, hit);
+            } else {
+              points.splice(i + 1);
+              points.splice(0, j + 1, hit);
+            }
+            changed = true;
+            break;
+          }
+        }
+        if (changed) break;
       }
-      smoothed[i] = Math.max(minOffset, Math.min(defaultOffset, minVal));
     }
-    return smoothed;
+    return points;
   }
 
   private buildRoad(): void {
@@ -139,23 +150,20 @@ export class Track {
     const roadIndices: number[] = [];
     const edgePositions: number[] = [];
     const edgeIndices: number[] = [];
+    const half = this.roadHalfWidth;
     const edgeWidth = 0.28;
-    const leftOffsets = this.computeSideOffsets(-1, this.roadHalfWidth, 3.0, 0.72);
-    const rightOffsets = this.computeSideOffsets(1, this.roadHalfWidth, 3.0, 0.72);
 
     for (let i = 0; i < this.samples.length; i += 1) {
       const sample = this.samples[i];
-      const leftH = leftOffsets[i];
-      const rightH = rightOffsets[i];
-      const left = sample.position.clone().addScaledVector(sample.lateral, -leftH);
-      const right = sample.position.clone().addScaledVector(sample.lateral, rightH);
+      const left = sample.position.clone().addScaledVector(sample.lateral, -half);
+      const right = sample.position.clone().addScaledVector(sample.lateral, half);
       roadPositions.push(left.x, 0.04, left.z, right.x, 0.04, right.z);
 
       const base = i * 2;
       const nextBase = ((i + 1) % this.samples.length) * 2;
       roadIndices.push(base, base + 1, nextBase, base + 1, nextBase + 1, nextBase);
-      const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(leftH + edgeWidth));
-      const rightEdge = sample.position.clone().addScaledVector(sample.lateral, rightH + edgeWidth);
+      const leftEdge = sample.position.clone().addScaledVector(sample.lateral, -(half + edgeWidth));
+      const rightEdge = sample.position.clone().addScaledVector(sample.lateral, half + edgeWidth);
       edgePositions.push(
         leftEdge.x, 0.055, leftEdge.z,
         left.x, 0.058, left.z,
@@ -237,8 +245,21 @@ export class Track {
     const postMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fencePost, roughness: 0.72 });
     const capMaterial = new THREE.MeshStandardMaterial({ color: this.config.theme.fenceCap, roughness: 0.72 });
     const railStep = 3;
-    const segmentCount = this.samples.length / railStep;
-    const instanceCount = segmentCount * 2;
+
+    // 1. Generate raw offset polyline for left (-1) and right (+1)
+    const rawLeft: THREE.Vector3[] = [];
+    const rawRight: THREE.Vector3[] = [];
+    for (let i = 0; i < this.samples.length; i += railStep) {
+      const sample = this.samples[i];
+      rawLeft.push(sample.position.clone().addScaledVector(sample.lateral, -this.fenceLimit));
+      rawRight.push(sample.position.clone().addScaledVector(sample.lateral, this.fenceLimit));
+    }
+
+    // 2. Untangle loops at sharp corners into clean Miter Apex vertices (锐角转折点)
+    const leftPoints = this.untangleFencePolyline(rawLeft);
+    const rightPoints = this.untangleFencePolyline(rawRight);
+    const instanceCount = leftPoints.length + rightPoints.length;
+
     const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.24, 1.08, 0.24), postMaterial, instanceCount);
     const caps = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.1, 0.3), capMaterial, instanceCount);
     const upperRails = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.18, 1), railMaterial, instanceCount);
@@ -249,22 +270,14 @@ export class Track {
       this.group.add(mesh);
     }
 
-    const leftOffsets = this.computeSideOffsets(-1, this.fenceLimit, 3.2, 0.58);
-    const rightOffsets = this.computeSideOffsets(1, this.fenceLimit, 3.2, 0.58);
-
     const transform = new THREE.Object3D();
     let instance = 0;
-    for (let i = 0; i < this.samples.length; i += railStep) {
-      const sample = this.samples[i];
-      const next = this.samples[(i + railStep) % this.samples.length];
-      const nextIndex = (i + railStep) % this.samples.length;
 
-      for (const side of [-1, 1]) {
-        const curOffset = side === -1 ? leftOffsets[i] : rightOffsets[i];
-        const nxtOffset = side === -1 ? leftOffsets[nextIndex] : rightOffsets[nextIndex];
-
-        const postPosition = sample.position.clone().addScaledVector(sample.lateral, side * curOffset);
-        const nextPostPosition = next.position.clone().addScaledVector(next.lateral, side * nxtOffset);
+    for (const polyline of [leftPoints, rightPoints]) {
+      const count = polyline.length;
+      for (let i = 0; i < count; i += 1) {
+        const postPosition = polyline[i];
+        const nextPostPosition = polyline[(i + 1) % count];
         const segment = nextPostPosition.clone().sub(postPosition);
         const midpoint = postPosition.clone().lerp(nextPostPosition, 0.5);
         const railYaw = Math.atan2(segment.x, segment.z);
