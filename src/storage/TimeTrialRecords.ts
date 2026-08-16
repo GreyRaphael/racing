@@ -16,6 +16,10 @@ interface MultiTrackStorage {
   meadow?: Partial<TimeTrialRecord>;
   desert?: Partial<TimeTrialRecord>;
   snow?: Partial<TimeTrialRecord>;
+  atoll?: Partial<TimeTrialRecord>;
+  autumn?: Partial<TimeTrialRecord>;
+  lava?: Partial<TimeTrialRecord>;
+  sakura?: Partial<TimeTrialRecord>;
 }
 
 const STORAGE_KEY = 'sunny-kart-time-trial-v1';

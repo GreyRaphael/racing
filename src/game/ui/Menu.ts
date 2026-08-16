@@ -2,6 +2,18 @@ import { RaceMode } from '../systems/RaceSystem';
 import { TimeTrialRecords } from '../../storage/TimeTrialRecords';
 import { TRACK_CONFIGS, TrackId, formatTime } from '../constants';
 
+const TRACK_EYEBROWS: Record<TrackId, string> = {
+  meadow: 'SUNNY MEADOW CIRCUIT',
+  desert: 'GOLDEN DUNES CIRCUIT',
+  snow: 'FROST PEAK CIRCUIT',
+  atoll: 'TROPICAL ATOLL CIRCUIT',
+  autumn: 'MAPLE VALLEY CIRCUIT',
+  lava: 'MAGMA CALDERA CIRCUIT',
+  sakura: 'CHERRY SAKURA CIRCUIT',
+};
+
+const ALL_TRACK_IDS: TrackId[] = ['meadow', 'desert', 'snow', 'atoll', 'autumn', 'lava', 'sakura'];
+
 export class Menu {
   private readonly root = this.require<HTMLElement>('#menu-screen');
   private readonly startButton = this.require<HTMLButtonElement>('#start-race');
@@ -22,12 +34,10 @@ export class Menu {
     timeTrial.addEventListener('click', () => this.selectMode('time-trial'));
     race.addEventListener('click', () => this.selectMode('race'));
 
-    const meadowBtn = this.require<HTMLButtonElement>('#track-meadow');
-    const desertBtn = this.require<HTMLButtonElement>('#track-desert');
-    const snowBtn = this.require<HTMLButtonElement>('#track-snow');
-    meadowBtn.addEventListener('click', () => this.selectTrack('meadow'));
-    desertBtn.addEventListener('click', () => this.selectTrack('desert'));
-    snowBtn.addEventListener('click', () => this.selectTrack('snow'));
+    ALL_TRACK_IDS.forEach((id) => {
+      const btn = this.require<HTMLButtonElement>(`#track-${id}`);
+      btn.addEventListener('click', () => this.selectTrack(id));
+    });
 
     this.startButton.addEventListener('click', () => onStart(this.mode));
     this.refreshRecord();
@@ -45,24 +55,15 @@ export class Menu {
 
   selectTrack(trackId: TrackId): void {
     this.trackId = trackId;
-    const meadowBtn = this.require<HTMLButtonElement>('#track-meadow');
-    const desertBtn = this.require<HTMLButtonElement>('#track-desert');
-    const snowBtn = this.require<HTMLButtonElement>('#track-snow');
-    meadowBtn.classList.toggle('selected', trackId === 'meadow');
-    desertBtn.classList.toggle('selected', trackId === 'desert');
-    snowBtn.classList.toggle('selected', trackId === 'snow');
-    meadowBtn.setAttribute('aria-pressed', String(trackId === 'meadow'));
-    desertBtn.setAttribute('aria-pressed', String(trackId === 'desert'));
-    snowBtn.setAttribute('aria-pressed', String(trackId === 'snow'));
+    ALL_TRACK_IDS.forEach((id) => {
+      const btn = this.require<HTMLButtonElement>(`#track-${id}`);
+      const isCurrent = id === trackId;
+      btn.classList.toggle('selected', isCurrent);
+      btn.setAttribute('aria-pressed', String(isCurrent));
+    });
 
     const config = TRACK_CONFIGS[trackId];
-    if (trackId === 'desert') {
-      this.eyebrow.textContent = 'GOLDEN DUNES CIRCUIT';
-    } else if (trackId === 'snow') {
-      this.eyebrow.textContent = 'FROST PEAK CIRCUIT';
-    } else {
-      this.eyebrow.textContent = 'SUNNY MEADOW CIRCUIT';
-    }
+    this.eyebrow.textContent = TRACK_EYEBROWS[trackId] || 'RACING CIRCUIT';
     this.trackName.textContent = config.name;
     this.subtitle.textContent = config.subtitle;
 

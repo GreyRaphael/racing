@@ -18,6 +18,18 @@ export class Environment {
     } else if (this.config.id === 'snow') {
       this.buildSnowScenery();
       this.buildSnowStartArch();
+    } else if (this.config.id === 'atoll') {
+      this.buildAtollScenery();
+      this.buildAtollStartArch();
+    } else if (this.config.id === 'autumn') {
+      this.buildAutumnScenery();
+      this.buildAutumnStartArch();
+    } else if (this.config.id === 'lava') {
+      this.buildLavaScenery();
+      this.buildLavaStartArch();
+    } else if (this.config.id === 'sakura') {
+      this.buildSakuraScenery();
+      this.buildSakuraStartArch();
     } else {
       this.buildMeadowScenery();
       this.buildMeadowStartArch();
@@ -58,11 +70,12 @@ export class Environment {
   private buildGround(): void {
     const isDesert = this.config.id === 'desert';
     const isSnow = this.config.id === 'snow';
+    const isLava = this.config.id === 'lava';
 
     // 1. Inner Ground (receives shadows from karts and scenery)
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(240, 240),
-      new THREE.MeshStandardMaterial({ color: this.config.theme.ground, roughness: isSnow ? 0.88 : 0.95 }),
+      new THREE.MeshStandardMaterial({ color: this.config.theme.ground, roughness: isSnow || isLava ? 0.88 : 0.95 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.02;
@@ -86,7 +99,7 @@ export class Environment {
       color: this.config.theme.groundPatches,
       roughness: 1,
       transparent: true,
-      opacity: isDesert ? 0.38 : 0.28,
+      opacity: isDesert ? 0.38 : isLava ? 0.45 : 0.28,
     });
     for (let i = 0; i < 32; i += 1) {
       const angle = i * 2.399;
@@ -94,7 +107,7 @@ export class Environment {
       const patch = new THREE.Mesh(new THREE.CircleGeometry(2.6 + (i % 5) * 0.8, 7), patchMaterial);
       patch.rotation.x = -Math.PI / 2;
       patch.position.set(Math.cos(angle) * radius, 0.005, Math.sin(angle) * radius);
-      patch.scale.set(isDesert ? 2.2 : 1.7, 1, 0.65 + (i % 3) * 0.2);
+      patch.scale.set(isDesert || isLava ? 2.2 : 1.7, 1, 0.65 + (i % 3) * 0.2);
       patches.add(patch);
     }
     this.group.add(patches);
@@ -103,11 +116,15 @@ export class Environment {
   private buildDistantMountains(): void {
     const isDesert = this.config.id === 'desert';
     const isSnow = this.config.id === 'snow';
+    const isLava = this.config.id === 'lava';
+    const isSakura = this.config.id === 'sakura';
+    const isAtoll = this.config.id === 'atoll';
+    const isAutumn = this.config.id === 'autumn';
     const group = new THREE.Group();
     const nearMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainNear, flatShading: true });
     const farMat = new THREE.MeshLambertMaterial({ color: this.config.theme.mountainFar, flatShading: true });
 
-    // Layer 1: Mid-Distant Foothills / Mesas / Alpine Peaks (Radius 220m - 270m)
+    // Layer 1: Mid-Distant Foothills / Mesas / Alpine Peaks / Volcanic Cones (Radius 220m - 270m)
     const nearCount = 22;
     for (let i = 0; i < nearCount; i += 1) {
       const angle = (i / nearCount) * Math.PI * 2 + (i % 3) * 0.08;
@@ -122,9 +139,15 @@ export class Environment {
         // Sandstone mesas and canyon buttes
         const topR = baseR * (0.42 + (i % 3) * 0.16);
         geom = new THREE.CylinderGeometry(topR, baseR, height, 6);
-      } else if (isSnow) {
-        // Alpine sharp jagged peaks
+      } else if (isSnow || isLava) {
+        // Alpine sharp jagged peaks or volcanic jagged calderas
         geom = new THREE.ConeGeometry(baseR, height * 1.35, 4 + (i % 2));
+      } else if (isAtoll) {
+        // Tropical ocean volcanic island cones
+        geom = new THREE.ConeGeometry(baseR * 1.15, height * 0.85, 5 + (i % 2));
+      } else if (isAutumn || isSakura) {
+        // Serene mountain ridges
+        geom = new THREE.ConeGeometry(baseR, height * 1.1, 5 + (i % 2));
       } else {
         // Rolling green foothills
         geom = new THREE.ConeGeometry(baseR, height, 5 + (i % 2));
@@ -137,8 +160,8 @@ export class Environment {
       mesh.receiveShadow = false;
       group.add(mesh);
 
-      // Add snow-cap for snow mountains
-      if (isSnow) {
+      // Add snow-cap for snow mountains or Fuji silhouette
+      if (isSnow || (isSakura && i % 4 === 0)) {
         const capGeom = new THREE.ConeGeometry(baseR * 0.42, height * 0.55, 4 + (i % 2));
         const cap = new THREE.Mesh(capGeom, new THREE.MeshLambertMaterial({ color: COLORS.snowWhite, flatShading: true }));
         cap.position.set(x, height * 0.95, z);
@@ -173,9 +196,22 @@ export class Environment {
   private buildClouds(): void {
     const isDesert = this.config.id === 'desert';
     const isSnow = this.config.id === 'snow';
+    const isLava = this.config.id === 'lava';
+    const isAutumn = this.config.id === 'autumn';
+    const isSakura = this.config.id === 'sakura';
     const clouds = new THREE.Group();
-    const cloudColor = isDesert ? 0xfff0dd : isSnow ? 0xecf6fc : 0xffffff;
-    const cloudMat = new THREE.MeshBasicMaterial({ color: cloudColor, transparent: true, opacity: 0.85 });
+    const cloudColor = isDesert
+      ? 0xfff0dd
+      : isSnow
+        ? 0xecf6fc
+        : isLava
+          ? 0x5a3232
+          : isAutumn
+            ? 0xffeed8
+            : isSakura
+              ? 0xfff0f6
+              : 0xffffff;
+    const cloudMat = new THREE.MeshBasicMaterial({ color: cloudColor, transparent: true, opacity: isLava ? 0.72 : 0.85 });
 
     for (let i = 0; i < 14; i += 1) {
       const angle = (i / 14) * Math.PI * 2 + (i % 3) * 0.2;
@@ -828,6 +864,697 @@ export class Environment {
     );
     sign.position.set(0, 5.5, 0);
     arch.add(sign);
+
+    this.group.add(arch);
+  }
+
+  // ==========================================
+  // 🌴 4. ATOLL (碧海环礁) SCENERY & PROPS
+  // ==========================================
+
+  private buildAtollScenery(): void {
+    const group = new THREE.Group();
+    const trackSamples = this.track.samples;
+    const step = 8;
+
+    for (let i = 0; i < trackSamples.length; i += step) {
+      const sample = trackSamples[i];
+      const side = (i / step) % 2 === 0 ? -1 : 1;
+      const offset = 14 + (i % 5) * 2.8;
+      const pos = sample.position.clone().addScaledVector(sample.lateral, side * offset);
+      if (!this.isClearOfTrack(pos, 8.8)) continue;
+
+      if ((i / step) % 3 === 0) {
+        group.add(this.createBeachUmbrella(pos, 1.0 + (i % 3) * 0.15));
+      } else {
+        group.add(this.createPalmTree(pos, 0.95 + (i % 4) * 0.15));
+      }
+    }
+
+    // Seashell Reef Rocks
+    for (let i = 0; i < 28; i += 1) {
+      const angle = i * 2.4;
+      const radius = 22 + (i * 13) % 45;
+      const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 8.8)) continue;
+      group.add(this.createSeashellRock(pos, 0.8 + (i % 3) * 0.25));
+    }
+
+    // Central Lagoon / Tropical Basin
+    const basinCenter = new THREE.Vector3(8, 0, 4);
+    if (this.isClearOfTrack(basinCenter, 15)) {
+      group.add(this.createTropicalBasin(basinCenter));
+    }
+
+    this.group.add(group);
+  }
+
+  private createPalmTree(position: THREE.Vector3, scale = 1): THREE.Group {
+    const tree = new THREE.Group();
+    tree.position.copy(position);
+    tree.scale.setScalar(scale);
+
+    const trunkMat = new THREE.MeshStandardMaterial({ color: COLORS.palmTrunk, roughness: 0.85, flatShading: true });
+    const leafMat = new THREE.MeshStandardMaterial({ color: COLORS.atollPalmLeaf, roughness: 0.65, flatShading: true });
+    const coconutMat = new THREE.MeshStandardMaterial({ color: 0x5c3d28, roughness: 0.8 });
+
+    // Segmented curved trunk
+    let currY = 0;
+    let currX = 0;
+    const segments = 4;
+    const curveDir = ((position.x * 13 + position.z * 7) % 6.28);
+    for (let i = 0; i < segments; i += 1) {
+      const segH = 1.25;
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.32 - i * 0.04, 0.4 - i * 0.04, segH, 6), trunkMat);
+      seg.position.set(currX, currY + segH / 2, 0);
+      seg.rotation.z = Math.sin(curveDir) * 0.08 * (i + 1);
+      seg.castShadow = true;
+      tree.add(seg);
+      currY += segH;
+      currX += Math.sin(curveDir) * 0.25;
+    }
+
+    // Coconuts
+    for (let i = 0; i < 3; i += 1) {
+      const angle = (i * Math.PI * 2) / 3;
+      const nut = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), coconutMat);
+      nut.position.set(currX + Math.cos(angle) * 0.35, currY - 0.2, Math.sin(angle) * 0.35);
+      nut.castShadow = true;
+      tree.add(nut);
+    }
+
+    // Palm Fronds
+    const fronds = 7;
+    for (let i = 0; i < fronds; i += 1) {
+      const angle = (i * Math.PI * 2) / fronds;
+      const frond = new THREE.Mesh(new THREE.ConeGeometry(0.7, 3.2, 4), leafMat);
+      frond.position.set(currX + Math.cos(angle) * 1.4, currY - 0.25, Math.sin(angle) * 1.4);
+      frond.rotation.x = Math.PI / 2.3;
+      frond.rotation.z = -angle;
+      frond.scale.set(1, 1, 0.2);
+      frond.castShadow = true;
+      tree.add(frond);
+    }
+
+    return tree;
+  }
+
+  private createBeachUmbrella(position: THREE.Vector3, scale = 1): THREE.Group {
+    const umbrella = new THREE.Group();
+    umbrella.position.copy(position);
+    umbrella.scale.setScalar(scale);
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0xc49d68, roughness: 0.8 });
+    const canopyMat = new THREE.MeshStandardMaterial({ color: COLORS.atollUmbrella, roughness: 0.6, flatShading: true });
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, flatShading: true });
+
+    // Pole
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.8, 6), woodMat);
+    pole.position.y = 1.4;
+    pole.rotation.z = 0.08;
+    pole.castShadow = true;
+    umbrella.add(pole);
+
+    // Canopy
+    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.7, 8), canopyMat);
+    canopy.position.set(0.12, 2.75, 0);
+    canopy.castShadow = true;
+    umbrella.add(canopy);
+
+    // Lounge chair
+    const chair = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.35, 1.8), whiteMat);
+    chair.position.set(0.9, 0.18, 0.4);
+    chair.rotation.y = 0.3;
+    chair.castShadow = true;
+    umbrella.add(chair);
+
+    return umbrella;
+  }
+
+  private createSeashellRock(position: THREE.Vector3, scale = 1): THREE.Group {
+    const rockGroup = new THREE.Group();
+    rockGroup.position.copy(position);
+    rockGroup.scale.setScalar(scale);
+
+    const rockMat = new THREE.MeshStandardMaterial({ color: COLORS.atollReef, roughness: 0.9, flatShading: true });
+    const starMat = new THREE.MeshStandardMaterial({ color: 0xeb5b5b, roughness: 0.7, flatShading: true });
+
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), rockMat);
+    rock.position.y = 0.6;
+    rock.scale.set(1.4, 0.8, 1.1);
+    rock.castShadow = true;
+    rockGroup.add(rock);
+
+    // Starfish on rock
+    const star = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.1, 5), starMat);
+    star.position.set(0.4, 1.15, 0.3);
+    star.rotation.x = 0.4;
+    rockGroup.add(star);
+
+    return rockGroup;
+  }
+
+  private createTropicalBasin(position: THREE.Vector3): THREE.Group {
+    const basin = new THREE.Group();
+    basin.position.copy(position);
+
+    const water = new THREE.Mesh(
+      new THREE.CircleGeometry(6.4, 16),
+      new THREE.MeshStandardMaterial({
+        color: COLORS.atollWater,
+        roughness: 0.1,
+        metalness: 0.2,
+        transparent: true,
+        opacity: 0.88,
+      }),
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.03;
+    basin.add(water);
+
+    for (let i = 0; i < 4; i += 1) {
+      const angle = (i * Math.PI) / 2 + 0.3;
+      const palmLocal = new THREE.Vector3(Math.cos(angle) * 6.2, 0, Math.sin(angle) * 6.2);
+      const palmWorld = position.clone().add(palmLocal);
+      if (this.isClearOfTrack(palmWorld, 8.5)) {
+        basin.add(this.createPalmTree(palmLocal, 1.05 + (i % 2) * 0.15));
+      }
+    }
+    return basin;
+  }
+
+  private buildAtollStartArch(): void {
+    const sample = this.track.samples[0];
+    const arch = new THREE.Group();
+    const yaw = Math.atan2(sample.tangent.x, sample.tangent.z);
+    arch.position.copy(sample.position);
+    arch.rotation.y = yaw;
+
+    const woodMaterial = new THREE.MeshStandardMaterial({ color: 0x78553d, roughness: 0.8, flatShading: true });
+    const bannerMaterial = new THREE.MeshStandardMaterial({ color: 0x2c728c, roughness: 0.7, flatShading: true });
+
+    const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, 5.8, 8), woodMaterial);
+    leftPillar.position.set(-5.8, 2.9, 0);
+    leftPillar.castShadow = true;
+    arch.add(leftPillar);
+
+    const rightPillar = leftPillar.clone();
+    rightPillar.position.x = 5.8;
+    arch.add(rightPillar);
+
+    const topBeam = new THREE.Mesh(new THREE.BoxGeometry(12.5, 0.75, 0.75), woodMaterial);
+    topBeam.position.y = 5.5;
+    topBeam.castShadow = true;
+    arch.add(topBeam);
+
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(8.2, 0.65, 0.88),
+      bannerMaterial,
+    );
+    sign.position.set(0, 5.5, 0);
+    arch.add(sign);
+
+    this.group.add(arch);
+  }
+
+  // ==========================================
+  // 🍂 5. AUTUMN (枫叶山谷) SCENERY & PROPS
+  // ==========================================
+
+  private buildAutumnScenery(): void {
+    const group = new THREE.Group();
+    const trackSamples = this.track.samples;
+    const step = 7;
+
+    for (let i = 0; i < trackSamples.length; i += step) {
+      const sample = trackSamples[i];
+      const side = (i / step) % 2 === 0 ? -1 : 1;
+      const offset = 13 + (i % 4) * 2.6;
+      const pos = sample.position.clone().addScaledVector(sample.lateral, side * offset);
+      if (!this.isClearOfTrack(pos, 8.8)) continue;
+
+      const variant = (i / step) % 3;
+      group.add(this.createMapleTree(pos, 0.95 + (i % 3) * 0.18, variant));
+    }
+
+    // Rustic Windmills & Autumn Stone Lanterns
+    for (let i = 0; i < 26; i += 1) {
+      const angle = i * 2.35;
+      const radius = 24 + (i * 15) % 46;
+      const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 9.0)) continue;
+
+      if (i % 6 === 0) {
+        group.add(this.createWindmill(pos, 1.1));
+      } else if (i % 3 === 0) {
+        group.add(this.createAutumnStoneLantern(pos, 0.95));
+      } else {
+        group.add(this.createMapleTree(pos, 1.1, i % 3));
+      }
+    }
+
+    this.group.add(group);
+  }
+
+  private createMapleTree(position: THREE.Vector3, scale = 1, variant = 0): THREE.Group {
+    const tree = new THREE.Group();
+    tree.position.copy(position);
+    tree.scale.setScalar(scale);
+
+    const trunkMat = new THREE.MeshStandardMaterial({ color: COLORS.mapleTrunk, roughness: 0.85, flatShading: true });
+    const leafColor = variant === 0 ? COLORS.mapleRed : variant === 1 ? COLORS.mapleOrange : COLORS.mapleYellow;
+    const leafMat = new THREE.MeshStandardMaterial({ color: leafColor, roughness: 0.72, flatShading: true });
+
+    // Trunk
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.44, 2.2, 6), trunkMat);
+    trunk.position.y = 1.1;
+    trunk.castShadow = true;
+    tree.add(trunk);
+
+    // Multi-tiered foliage
+    const tiers = 3;
+    for (let i = 0; i < tiers; i += 1) {
+      const r = 1.8 - i * 0.4;
+      const h = 1.6;
+      const foliage = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), leafMat);
+      foliage.position.y = 2.2 + i * 1.05;
+      foliage.rotation.y = (i * 0.5);
+      foliage.castShadow = true;
+      tree.add(foliage);
+    }
+
+    return tree;
+  }
+
+  private createWindmill(position: THREE.Vector3, scale = 1): THREE.Group {
+    const windmill = new THREE.Group();
+    windmill.position.copy(position);
+    windmill.scale.setScalar(scale);
+
+    const bodyMat = new THREE.MeshStandardMaterial({ color: COLORS.windmillWood, roughness: 0.85, flatShading: true });
+    const roofMat = new THREE.MeshStandardMaterial({ color: COLORS.mapleRed, roughness: 0.75, flatShading: true });
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xf5f0dd, roughness: 0.7, flatShading: true });
+
+    // Tapered tower body
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.2, 6.2, 8), bodyMat);
+    tower.position.y = 3.1;
+    tower.castShadow = true;
+    windmill.add(tower);
+
+    // Roof
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.8, 2.0, 8), roofMat);
+    roof.position.y = 7.2;
+    roof.castShadow = true;
+    windmill.add(roof);
+
+    // 4 Blades
+    for (let i = 0; i < 4; i += 1) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.5, 3.4, 0.1), bladeMat);
+      blade.position.set(0, 5.8, 1.45);
+      blade.rotation.z = (i * Math.PI) / 2 + 0.4;
+      blade.castShadow = true;
+      windmill.add(blade);
+    }
+
+    return windmill;
+  }
+
+  private createAutumnStoneLantern(position: THREE.Vector3, scale = 1): THREE.Group {
+    const lantern = new THREE.Group();
+    lantern.position.copy(position);
+    lantern.scale.setScalar(scale);
+
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x827c76, roughness: 0.9, flatShading: true });
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xffb84d });
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.4, 0.9), stoneMat);
+    base.position.y = 0.2;
+    lantern.add(base);
+
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 1.2, 6), stoneMat);
+    pillar.position.y = 1.0;
+    lantern.add(pillar);
+
+    const chamber = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.65), stoneMat);
+    chamber.position.y = 1.8;
+    lantern.add(chamber);
+
+    const light = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), glowMat);
+    light.position.y = 1.8;
+    lantern.add(light);
+
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.55, 4), stoneMat);
+    cap.position.y = 2.35;
+    cap.rotation.y = Math.PI / 4;
+    lantern.add(cap);
+
+    return lantern;
+  }
+
+  private buildAutumnStartArch(): void {
+    const sample = this.track.samples[0];
+    const arch = new THREE.Group();
+    const yaw = Math.atan2(sample.tangent.x, sample.tangent.z);
+    arch.position.copy(sample.position);
+    arch.rotation.y = yaw;
+
+    const woodMaterial = new THREE.MeshStandardMaterial({ color: COLORS.mapleTrunk, roughness: 0.85, flatShading: true });
+    const signMaterial = new THREE.MeshStandardMaterial({ color: COLORS.mapleOrange, roughness: 0.72, flatShading: true });
+
+    const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(0.75, 5.8, 0.75), woodMaterial);
+    leftPillar.position.set(-5.8, 2.9, 0);
+    leftPillar.castShadow = true;
+    arch.add(leftPillar);
+
+    const rightPillar = leftPillar.clone();
+    rightPillar.position.x = 5.8;
+    arch.add(rightPillar);
+
+    const topBeam = new THREE.Mesh(new THREE.BoxGeometry(12.5, 0.85, 0.85), woodMaterial);
+    topBeam.position.y = 5.5;
+    topBeam.castShadow = true;
+    arch.add(topBeam);
+
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.65, 0.92), signMaterial);
+    sign.position.set(0, 5.5, 0);
+    arch.add(sign);
+
+    this.group.add(arch);
+  }
+
+  // ==========================================
+  // 🌋 6. LAVA (熔岩裂谷) SCENERY & PROPS
+  // ==========================================
+
+  private buildLavaScenery(): void {
+    const group = new THREE.Group();
+    const trackSamples = this.track.samples;
+    const step = 7;
+
+    for (let i = 0; i < trackSamples.length; i += step) {
+      const sample = trackSamples[i];
+      const side = (i / step) % 2 === 0 ? -1 : 1;
+      const offset = 13 + (i % 4) * 2.5;
+      const pos = sample.position.clone().addScaledVector(sample.lateral, side * offset);
+      if (!this.isClearOfTrack(pos, 8.8)) continue;
+
+      if ((i / step) % 3 === 0) {
+        group.add(this.createVolcanicRock(pos, 1.0 + (i % 3) * 0.2));
+      } else {
+        group.add(this.createBasaltPillar(pos, 1.0, 3 + (i % 4) * 1.5));
+      }
+    }
+
+    // Magma pools and obsidian formations
+    for (let i = 0; i < 24; i += 1) {
+      const angle = i * 2.5;
+      const radius = 20 + (i * 17) % 48;
+      const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 9.0)) continue;
+
+      if (i % 4 === 0) {
+        group.add(this.createMagmaPool(pos, 3.8 + (i % 3) * 0.8));
+      } else {
+        group.add(this.createBasaltPillar(pos, 1.0 + (i % 2) * 0.3, 4 + (i % 3) * 2));
+      }
+    }
+
+    this.group.add(group);
+  }
+
+  private createBasaltPillar(position: THREE.Vector3, scale = 1, height = 4): THREE.Group {
+    const cluster = new THREE.Group();
+    cluster.position.copy(position);
+    cluster.scale.setScalar(scale);
+
+    const basaltMat = new THREE.MeshStandardMaterial({ color: COLORS.basaltPillar, roughness: 0.88, flatShading: true });
+    const mainPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.9, height, 6), basaltMat);
+    mainPillar.position.y = height / 2;
+    mainPillar.castShadow = true;
+    cluster.add(mainPillar);
+
+    // Subsidiary side pillars
+    for (let i = 0; i < 2; i += 1) {
+      const subH = height * (0.55 + i * 0.2);
+      const sub = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.65, subH, 6), basaltMat);
+      sub.position.set(0.95 * (i === 0 ? 1 : -1), subH / 2, 0.7);
+      sub.castShadow = true;
+      cluster.add(sub);
+    }
+
+    return cluster;
+  }
+
+  private createMagmaPool(position: THREE.Vector3, radius = 4.2): THREE.Group {
+    const pool = new THREE.Group();
+    pool.position.copy(position);
+
+    const lavaMesh = new THREE.Mesh(
+      new THREE.CircleGeometry(radius, 14),
+      new THREE.MeshStandardMaterial({
+        color: 0xff3b10,
+        emissive: 0xff4818,
+        emissiveIntensity: 1.6,
+        roughness: 0.25,
+      }),
+    );
+    lavaMesh.rotation.x = -Math.PI / 2;
+    lavaMesh.position.y = 0.03;
+    pool.add(lavaMesh);
+
+    // Rim rocks
+    const rockMat = new THREE.MeshStandardMaterial({ color: COLORS.basaltPillar, roughness: 0.9, flatShading: true });
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (i * Math.PI * 2) / 6;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9, 0), rockMat);
+      rock.position.set(Math.cos(angle) * (radius + 0.5), 0.4, Math.sin(angle) * (radius + 0.5));
+      rock.castShadow = true;
+      pool.add(rock);
+    }
+
+    return pool;
+  }
+
+  private createVolcanicRock(position: THREE.Vector3, scale = 1): THREE.Group {
+    const group = new THREE.Group();
+    group.position.copy(position);
+    group.scale.setScalar(scale);
+
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x362c30, roughness: 0.92, flatShading: true });
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), rockMat);
+    rock.position.y = 0.75;
+    rock.scale.set(1.3, 1.1, 1.4);
+    rock.castShadow = true;
+    group.add(rock);
+
+    return group;
+  }
+
+  private buildLavaStartArch(): void {
+    const sample = this.track.samples[0];
+    const arch = new THREE.Group();
+    const yaw = Math.atan2(sample.tangent.x, sample.tangent.z);
+    arch.position.copy(sample.position);
+    arch.rotation.y = yaw;
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({ color: COLORS.basaltPillar, roughness: 0.88, flatShading: true });
+    const magmaMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff3b10,
+      emissive: 0xff4818,
+      emissiveIntensity: 1.8,
+    });
+
+    const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(0.85, 5.8, 0.85), stoneMaterial);
+    leftPillar.position.set(-5.8, 2.9, 0);
+    leftPillar.castShadow = true;
+    arch.add(leftPillar);
+
+    const rightPillar = leftPillar.clone();
+    rightPillar.position.x = 5.8;
+    arch.add(rightPillar);
+
+    const topBeam = new THREE.Mesh(new THREE.BoxGeometry(12.5, 0.9, 0.9), stoneMaterial);
+    topBeam.position.y = 5.5;
+    topBeam.castShadow = true;
+    arch.add(topBeam);
+
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.65, 0.98), magmaMaterial);
+    sign.position.set(0, 5.5, 0);
+    arch.add(sign);
+
+    this.group.add(arch);
+  }
+
+  // ==========================================
+  // 🌸 7. SAKURA (樱花幽谷) SCENERY & PROPS
+  // ==========================================
+
+  private buildSakuraScenery(): void {
+    const group = new THREE.Group();
+    const trackSamples = this.track.samples;
+    const step = 7;
+
+    for (let i = 0; i < trackSamples.length; i += step) {
+      const sample = trackSamples[i];
+      const side = (i / step) % 2 === 0 ? -1 : 1;
+      const offset = 13 + (i % 4) * 2.5;
+      const pos = sample.position.clone().addScaledVector(sample.lateral, side * offset);
+      if (!this.isClearOfTrack(pos, 8.8)) continue;
+
+      if ((i / step) % 4 === 0) {
+        group.add(this.createToroLantern(pos, 1.0));
+      } else {
+        group.add(this.createSakuraTree(pos, 0.95 + (i % 3) * 0.18));
+      }
+    }
+
+    // Zen rocks, lanterns, and extra cherry blossoms
+    for (let i = 0; i < 28; i += 1) {
+      const angle = i * 2.3;
+      const radius = 22 + (i * 14) % 48;
+      const pos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      if (!this.isClearOfTrack(pos, 9.0)) continue;
+
+      if (i % 5 === 0) {
+        group.add(this.createZenRock(pos, 1.1));
+      } else if (i % 3 === 0) {
+        group.add(this.createToroLantern(pos, 0.9));
+      } else {
+        group.add(this.createSakuraTree(pos, 1.05 + (i % 2) * 0.2));
+      }
+    }
+
+    this.group.add(group);
+  }
+
+  private createSakuraTree(position: THREE.Vector3, scale = 1): THREE.Group {
+    const tree = new THREE.Group();
+    tree.position.copy(position);
+    tree.scale.setScalar(scale);
+
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x543828, roughness: 0.85, flatShading: true });
+    const pinkMat = new THREE.MeshStandardMaterial({ color: COLORS.sakuraPink, roughness: 0.75, flatShading: true });
+    const lightPinkMat = new THREE.MeshStandardMaterial({ color: COLORS.sakuraPinkLight, roughness: 0.75, flatShading: true });
+
+    // Curved wood trunk
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 2.4, 6), trunkMat);
+    trunk.position.y = 1.2;
+    trunk.castShadow = true;
+    tree.add(trunk);
+
+    // Multi-puff sakura blossom canopy
+    const puff1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.8, 1), pinkMat);
+    puff1.position.set(0, 2.9, 0);
+    puff1.castShadow = true;
+    tree.add(puff1);
+
+    const puff2 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 1), lightPinkMat);
+    puff2.position.set(0.8, 3.4, 0.4);
+    puff2.castShadow = true;
+    tree.add(puff2);
+
+    const puff3 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 1), pinkMat);
+    puff3.position.set(-0.7, 3.2, -0.4);
+    puff3.castShadow = true;
+    tree.add(puff3);
+
+    return tree;
+  }
+
+  private createToroLantern(position: THREE.Vector3, scale = 1): THREE.Group {
+    const toro = new THREE.Group();
+    toro.position.copy(position);
+    toro.scale.setScalar(scale);
+
+    const stoneMat = new THREE.MeshStandardMaterial({ color: COLORS.stoneToro, roughness: 0.88, flatShading: true });
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xffe6a3 });
+
+    // Base
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.35, 6), stoneMat);
+    base.position.y = 0.18;
+    toro.add(base);
+
+    // Stem
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 1.1, 6), stoneMat);
+    stem.position.y = 0.9;
+    toro.add(stem);
+
+    // Platform
+    const plat = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.45, 0.3, 6), stoneMat);
+    plat.position.y = 1.6;
+    toro.add(plat);
+
+    // Firebox light
+    const light = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.48, 0.42), glowMat);
+    light.position.y = 1.95;
+    toro.add(light);
+
+    // Pagoda roof
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.9, 0.5, 6), stoneMat);
+    roof.position.y = 2.45;
+    toro.add(roof);
+
+    return toro;
+  }
+
+  private createZenRock(position: THREE.Vector3, scale = 1): THREE.Group {
+    const group = new THREE.Group();
+    group.position.copy(position);
+    group.scale.setScalar(scale);
+
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x727e85, roughness: 0.9, flatShading: true });
+    const mossMat = new THREE.MeshStandardMaterial({ color: 0x5a8a52, roughness: 0.95 });
+
+    const mainRock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.1, 0), rockMat);
+    mainRock.position.y = 0.65;
+    mainRock.scale.set(1.4, 0.9, 1.1);
+    mainRock.castShadow = true;
+    group.add(mainRock);
+
+    const moss = new THREE.Mesh(new THREE.CircleGeometry(1.8, 8), mossMat);
+    moss.rotation.x = -Math.PI / 2;
+    moss.position.y = 0.02;
+    group.add(moss);
+
+    return group;
+  }
+
+  private buildSakuraStartArch(): void {
+    const sample = this.track.samples[0];
+    const arch = new THREE.Group();
+    const yaw = Math.atan2(sample.tangent.x, sample.tangent.z);
+    arch.position.copy(sample.position);
+    arch.rotation.y = yaw;
+
+    const vermilionMat = new THREE.MeshStandardMaterial({ color: COLORS.toriiRed, roughness: 0.72, flatShading: true });
+    const blackMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.65, flatShading: true });
+
+    // Torii round pillars
+    const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 6.0, 8), vermilionMat);
+    leftPillar.position.set(-5.8, 3.0, 0);
+    leftPillar.castShadow = true;
+    arch.add(leftPillar);
+
+    const rightPillar = leftPillar.clone();
+    rightPillar.position.x = 5.8;
+    arch.add(rightPillar);
+
+    // Intermediate tie beam (Nuki)
+    const nukiBeam = new THREE.Mesh(new THREE.BoxGeometry(13.2, 0.55, 0.55), vermilionMat);
+    nukiBeam.position.y = 4.8;
+    nukiBeam.castShadow = true;
+    arch.add(nukiBeam);
+
+    // Top main beam (Kasagi) with black cap
+    const topBeam = new THREE.Mesh(new THREE.BoxGeometry(14.2, 0.75, 0.8), blackMat);
+    topBeam.position.y = 5.8;
+    topBeam.castShadow = true;
+    arch.add(topBeam);
+
+    // Central tablet
+    const tablet = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.25), blackMat);
+    tablet.position.set(0, 5.3, 0);
+    arch.add(tablet);
 
     this.group.add(arch);
   }
