@@ -1,6 +1,7 @@
 import { TRACK_CONFIGS, TrackConfig, TrackId, formatTime } from '../constants';
 import { PlayerKart } from '../kart/PlayerKart';
 import { RaceMode, RaceSystem } from '../systems/RaceSystem';
+import { GhostSystem } from '../systems/GhostSystem';
 import { TimeTrialRecords } from '../../storage/TimeTrialRecords';
 
 export class Hud {
@@ -17,6 +18,10 @@ export class Hud {
   private readonly position = this.require<HTMLElement>('#position-counter');
   private readonly leaderName = this.require<HTMLElement>('#leader-name');
   private readonly progressFill = this.require<HTMLElement>('#progress-fill');
+  private readonly ghostProgressMarker = this.require<HTMLElement>('#ghost-progress-marker');
+  private readonly ghostDeltaCard = this.require<HTMLElement>('#ghost-delta-card');
+  private readonly ghostDelta = this.require<HTMLElement>('#ghost-delta');
+  private readonly ghostTargetTime = this.require<HTMLElement>('#ghost-target-time');
   private readonly driftIndicator = this.require<HTMLElement>('#drift-indicator');
   private activeTrackId: TrackId = 'meadow';
 
@@ -33,16 +38,13 @@ export class Hud {
 
   hide(): void { this.root.classList.add('hidden'); }
 
-  // Best-lap record only changes when finishRace saves a result, at which
-  // point the HUD is hidden behind the results panel. Re-fetch on demand
-  // instead of parsing localStorage on every animation frame.
   refreshRecord(trackId: TrackId = this.activeTrackId): void {
     this.activeTrackId = trackId;
     const record = this.records.load(trackId);
     this.bestLap.textContent = record.bestLapTime === null ? '最佳 —' : `最佳 ${formatTime(record.bestLapTime)}`;
   }
 
-  update(race: RaceSystem, player: PlayerKart): void {
+  update(race: RaceSystem, player: PlayerKart, ghostSystem?: GhostSystem): void {
     this.lap.innerHTML = `${Math.min(player.lap, race.totalLaps)} <small>/ ${race.totalLaps}</small>`;
     this.lapTime.textContent = formatTime(race.currentLapTime);
     this.raceTime.textContent = formatTime(race.elapsedTime);
@@ -54,10 +56,38 @@ export class Hud {
     const isCountdown = race.phase === 'countdown';
     this.countdown.classList.toggle('hidden', !isCountdown);
     this.countdown.textContent = isCountdown ? String(race.countdownNumber) : '';
+
     if (race.mode === 'race') {
       this.position.innerHTML = `${race.playerPosition} <small>/ ${race.karts.length}</small>`;
       const leader = race.getRanking()[0];
       this.leaderName.textContent = `领先：${leader?.name ?? '你'}`;
+      this.ghostDeltaCard.classList.add('hidden');
+      this.ghostProgressMarker.classList.add('hidden');
+    } else if (ghostSystem && ghostSystem.enabled && ghostSystem.hasActiveGhost) {
+      this.ghostDeltaCard.classList.remove('hidden');
+      this.ghostProgressMarker.classList.remove('hidden');
+      const ghostData = ghostSystem.currentGhost;
+      if (ghostData) {
+        this.ghostTargetTime.textContent = `幽灵 ${formatTime(ghostData.totalTime)}`;
+      }
+
+      const playerTotalProgress = (player.lap - 1) + player.progress;
+      const delta = ghostSystem.calculateDelta(playerTotalProgress, race.elapsedTime);
+      if (delta !== null && race.phase === 'racing') {
+        const sign = delta < 0 ? '-' : '+';
+        const formatted = `${sign}${Math.abs(delta).toFixed(2)}s`;
+        this.ghostDelta.textContent = formatted;
+        this.ghostDelta.className = delta <= 0 ? 'leading' : 'trailing';
+      } else {
+        this.ghostDelta.textContent = '±0.00s';
+        this.ghostDelta.className = '';
+      }
+
+      const ghostLapProgress = ghostSystem.ghostKart.progress % 1;
+      this.ghostProgressMarker.style.left = `${Math.round(ghostLapProgress * 1000) / 10}%`;
+    } else {
+      this.ghostDeltaCard.classList.add('hidden');
+      this.ghostProgressMarker.classList.add('hidden');
     }
   }
 

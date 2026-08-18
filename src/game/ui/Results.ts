@@ -1,5 +1,6 @@
 import { TRACK_CONFIGS, TrackConfig, formatTime } from '../constants';
 import { RaceResult, RaceMode } from '../systems/RaceSystem';
+import { GhostFinishResult } from '../systems/GhostSystem';
 
 export class Results {
   private readonly root = this.require<HTMLElement>('#results-panel');
@@ -8,19 +9,41 @@ export class Results {
   private readonly total = this.require<HTMLElement>('#result-total-time');
   private readonly bestLap = this.require<HTMLElement>('#result-best-lap');
   private readonly ranking = this.require<HTMLElement>('#results-ranking');
+  private readonly ghostBadge = this.require<HTMLElement>('#ghost-result-badge');
+  private readonly ghostTitle = this.require<HTMLElement>('#ghost-result-title');
+  private readonly ghostDetail = this.require<HTMLElement>('#ghost-result-detail');
 
   constructor(onRestart: () => void, onMenu: () => void) {
     this.require<HTMLButtonElement>('#restart-race').addEventListener('click', onRestart);
     this.require<HTMLButtonElement>('#back-to-menu').addEventListener('click', onMenu);
   }
 
-  show(result: RaceResult, mode: RaceMode, trackConfig: TrackConfig = TRACK_CONFIGS.meadow): void {
+  show(
+    result: RaceResult,
+    mode: RaceMode,
+    trackConfig: TrackConfig = TRACK_CONFIGS.meadow,
+    ghostResult?: GhostFinishResult | null,
+  ): void {
     this.root.classList.remove('hidden');
     this.title.textContent = mode === 'race' ? this.getRaceTitle(result) : '漂亮完赛！';
     this.caption.textContent = mode === 'race' ? `${trackConfig.name}最终排名` : `${trackConfig.name}圈速记录`;
     this.total.textContent = formatTime(result.totalTime);
     const laps = result.lapTimes.length > 0 ? result.lapTimes : [result.totalTime];
     this.bestLap.textContent = formatTime(Math.min(...laps));
+
+    if (mode === 'time-trial' && ghostResult && ghostResult.beatGhost) {
+      this.ghostBadge.classList.remove('hidden');
+      if (ghostResult.previousBestTotal !== null && ghostResult.improvement !== null && ghostResult.improvement > 0) {
+        this.ghostTitle.textContent = '🎉 战胜幽灵车！';
+        this.ghostDetail.textContent = `原幽灵 ${formatTime(ghostResult.previousBestTotal)} · 提升 ${ghostResult.improvement.toFixed(3)}s · 纪录已更新`;
+      } else {
+        this.ghostTitle.textContent = '🎉 创造幽灵纪录！';
+        this.ghostDetail.textContent = '幽灵车轨迹已成功保存，下局可同台对决';
+      }
+    } else {
+      this.ghostBadge.classList.add('hidden');
+    }
+
     this.ranking.innerHTML = result.ranking.map((entry, index) => `
       <div class="rank-row ${entry.name === '你' ? 'player' : ''}">
         <span class="rank-number">${index + 1}</span>

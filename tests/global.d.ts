@@ -12,6 +12,8 @@ declare global {
       resetPlayer: () => void;
       setTrack: (trackId: 'meadow' | 'desert' | 'snow' | 'atoll' | 'autumn' | 'lava' | 'sakura' | 'citadel' | 'crystal') => boolean;
       getStorage: (trackId?: 'meadow' | 'desert' | 'snow' | 'atoll' | 'autumn' | 'lava' | 'sakura' | 'citadel' | 'crystal') => unknown;
+      getGhostStorage: (trackId?: 'meadow' | 'desert' | 'snow' | 'atoll' | 'autumn' | 'lava' | 'sakura' | 'citadel' | 'crystal') => unknown;
+      setGhostEnabled: (enabled: boolean) => boolean;
     };
   }
 }

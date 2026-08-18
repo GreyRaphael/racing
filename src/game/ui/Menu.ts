@@ -1,5 +1,6 @@
 import { RaceMode } from '../systems/RaceSystem';
 import { TimeTrialRecords } from '../../storage/TimeTrialRecords';
+import { GhostStorage } from '../../storage/GhostStorage';
 import { TRACK_CONFIGS, TrackId, formatTime } from '../constants';
 
 const TRACK_EYEBROWS: Record<TrackId, string> = {
@@ -23,13 +24,19 @@ export class Menu {
   private readonly eyebrow = this.require<HTMLElement>('#menu-eyebrow');
   private readonly trackName = this.require<HTMLElement>('#menu-track-name');
   private readonly subtitle = this.require<HTMLElement>('#menu-subtitle');
+  private readonly ghostReplayRow = this.require<HTMLElement>('#ghost-replay-toggle');
+  private readonly ghostStatusText = this.require<HTMLElement>('#menu-ghost-status');
+  private readonly ghostToggleButton = this.require<HTMLButtonElement>('#ghost-toggle-button');
   private mode: RaceMode = 'time-trial';
   private trackId: TrackId = 'meadow';
+  private ghostEnabled = true;
 
   constructor(
     private readonly records: TimeTrialRecords,
+    private readonly ghostStorage: GhostStorage,
     onStart: (mode: RaceMode) => void,
     private readonly onSelectTrack: (trackId: TrackId) => void,
+    private readonly onToggleGhost?: (enabled: boolean) => void,
   ) {
     const timeTrial = this.require<HTMLButtonElement>('#time-trial-mode');
     const race = this.require<HTMLButtonElement>('#race-mode');
@@ -41,12 +48,25 @@ export class Menu {
       btn.addEventListener('click', () => this.selectTrack(id));
     });
 
+    this.ghostToggleButton.addEventListener('click', () => {
+      this.setGhostEnabled(!this.ghostEnabled);
+    });
+
     this.startButton.addEventListener('click', () => onStart(this.mode));
     this.refreshRecord();
   }
 
   get selectedMode(): RaceMode { return this.mode; }
   get selectedTrack(): TrackId { return this.trackId; }
+  get isGhostEnabled(): boolean { return this.ghostEnabled; }
+
+  setGhostEnabled(enabled: boolean): void {
+    this.ghostEnabled = enabled;
+    this.ghostToggleButton.classList.toggle('active', enabled);
+    this.ghostToggleButton.setAttribute('aria-pressed', String(enabled));
+    this.ghostToggleButton.textContent = enabled ? '已开启' : '已关闭';
+    this.onToggleGhost?.(enabled);
+  }
 
   show(): void {
     this.root.classList.remove('hidden');
@@ -81,6 +101,7 @@ export class Menu {
     race.classList.toggle('selected', mode === 'race');
     timeTrial.setAttribute('aria-pressed', String(mode === 'time-trial'));
     race.setAttribute('aria-pressed', String(mode === 'race'));
+    this.ghostReplayRow.classList.toggle('hidden', mode !== 'time-trial');
     this.startButton.innerHTML = mode === 'race' ? '开始多人比赛 <span>→</span>' : '开始计时赛 <span>→</span>';
   }
 
@@ -88,6 +109,13 @@ export class Menu {
     const record = this.records.load(this.trackId);
     const value = record.bestTotalTime === null ? '暂无记录' : formatTime(record.bestTotalTime);
     this.recordLabel.innerHTML = `最佳总时间 — <span>${value}</span>`;
+
+    const ghost = this.ghostStorage.loadGhost(this.trackId);
+    if (ghost) {
+      this.ghostStatusText.textContent = `已记录 (${formatTime(ghost.totalTime)})`;
+    } else {
+      this.ghostStatusText.textContent = '暂无记录';
+    }
   }
 
   private require<T extends HTMLElement>(selector: string): T {

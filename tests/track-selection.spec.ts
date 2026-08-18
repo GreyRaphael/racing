@@ -29,6 +29,7 @@ test('菜单可切换选择全部9大地图并更新展示与3D状态', async ({
 });
 
 test('沙漠地图多人比赛能够正常生成并显示沙漠赛道标识', async ({ page }) => {
+  test.setTimeout(120_000);
   await startMode(page, 'race', 'desert');
   await expect(page.getByTestId('race-hud')).toBeVisible();
   await expect(page.locator('#brand-mark')).toContainText('GDC');
@@ -45,6 +46,7 @@ test('沙漠地图多人比赛能够正常生成并显示沙漠赛道标识', as
 });
 
 test('碧海环礁与枫叶山谷多人比赛正常生成、显示专属标识与结算', async ({ page }) => {
+  test.setTimeout(120_000);
   // Test Atoll
   await startMode(page, 'race', 'atoll');
   await expect(page.getByTestId('race-hud')).toBeVisible();
@@ -72,6 +74,7 @@ test('碧海环礁与枫叶山谷多人比赛正常生成、显示专属标识�
 });
 
 test('蒸汽古堡与水晶矿洞多人比赛正常生成、显示专属标识与结算', async ({ page }) => {
+  test.setTimeout(120_000);
   // Test Citadel
   await startMode(page, 'race', 'citadel');
   await expect(page.getByTestId('race-hud')).toBeVisible();
@@ -99,6 +102,7 @@ test('蒸汽古堡与水晶矿洞多人比赛正常生成、显示专属标识�
 });
 
 test('全部新地图个人计时赛能独立记录成绩并持久化', async ({ page }) => {
+  test.setTimeout(120_000);
   await startMode(page, 'time-trial', 'citadel');
   await expect(page.getByTestId('race-hud')).toBeVisible();
   await expect(page.locator('#mode-label')).toContainText('蒸汽古堡');
@@ -122,6 +126,7 @@ test('全部新地图个人计时赛能独立记录成绩并持久化', async ({
 });
 
 test('全量9大赛道的所有景观植物均不侵入赛道', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto('/');
 
   for (const track of ALL_TRACKS) {

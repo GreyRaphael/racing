@@ -10,6 +10,7 @@ import { CollisionSystem } from './systems/CollisionSystem';
 import { InputSystem } from './systems/InputSystem';
 import { ParticleSystem } from './systems/ParticleSystem';
 import { RaceMode, RaceSystem } from './systems/RaceSystem';
+import { GhostFinishResult, GhostSystem } from './systems/GhostSystem';
 import { Hud } from './ui/Hud';
 import { Menu } from './ui/Menu';
 import { Results } from './ui/Results';
@@ -31,6 +32,7 @@ export class Game {
     new AiKart('阳光', COLORS.yellow, this.track, { speed: 18.2, lookahead: 0.031, steeringBias: 0.018 }),
     new AiKart('紫电', COLORS.purple, this.track, { speed: 17.3, lookahead: 0.035, steeringBias: -0.01 }),
   ];
+  readonly ghostSystem: GhostSystem;
   readonly race: RaceSystem;
   readonly collision: CollisionSystem;
   readonly cameraSystem: CameraSystem;
@@ -45,6 +47,7 @@ export class Game {
   private animationFrame = 0;
   private lastPhase = 'menu';
   private lastCountdownNumber = 0;
+  private lastGhostResult: GhostFinishResult | null = null;
   private started = false;
   private readonly onResize = (): void => this.resize();
 
@@ -69,13 +72,18 @@ export class Game {
       this.scene.add(kart.group);
     }
 
+    this.ghostSystem = new GhostSystem(this.track);
+    this.scene.add(this.ghostSystem.ghostKart.group);
+
     this.race = new RaceSystem(this.track, this.player, this.ai, this.records, this.activeTrackId);
     this.collision = new CollisionSystem(this.track);
     this.cameraSystem = new CameraSystem(this.camera);
     this.menu = new Menu(
       this.records,
+      this.ghostSystem.storage,
       (mode) => this.startRace(mode),
       (trackId) => this.setTrack(trackId),
+      (enabled) => this.ghostSystem.setEnabled(enabled),
     );
     this.hud = new Hud(this.records);
     this.results = new Results(() => this.startRace(this.activeMode), () => this.returnToMenu());
@@ -125,6 +133,7 @@ export class Game {
     // Re-bind systems
     this.player.setTrack(this.track);
     for (const kart of this.ai) kart.setTrack(this.track);
+    this.ghostSystem.setTrack(this.track, trackId);
     this.collision.setTrack(this.track);
     this.race.setTrack(this.track, trackId);
 
@@ -133,6 +142,7 @@ export class Game {
     this.player.placeAt(0.002, 0);
     this.cameraSystem.update(1 / 60, this.player);
     this.hud.refreshRecord(trackId);
+    this.menu.refreshRecord();
   }
 
   private startRace(mode: RaceMode): void {
@@ -140,12 +150,14 @@ export class Game {
     this.audio.initialize();
     this.audio.resume();
     this.race.begin(mode);
+    this.ghostSystem.beginRace(mode);
+    this.lastGhostResult = null;
     this.lastCountdownNumber = 0;
     this.menu.hide();
     this.results.hide();
     this.hud.show(mode, TRACK_CONFIGS[this.activeTrackId]);
     this.lastPhase = this.race.phase;
-    this.hud.update(this.race, this.player);
+    this.hud.update(this.race, this.player, this.ghostSystem);
   }
 
   private returnToMenu(): void {
@@ -153,6 +165,7 @@ export class Game {
     this.audio.stopEngine();
     this.results.hide();
     this.hud.hide();
+    this.ghostSystem.beginRace('menu');
     this.menu.show();
     for (const kart of this.ai) kart.group.visible = false;
     this.player.resetRaceState();
@@ -182,6 +195,8 @@ export class Game {
       if (this.race.mode === 'race') {
         for (const kart of this.ai) kart.update(delta, canDrive, playerRaceProgress);
       }
+      this.ghostSystem.update(delta, this.race.elapsedTime, this.player, this.race.phase === 'racing', this.race.mode);
+
       const collisionResolution = this.collision.resolve(allKarts);
       for (const [kart, result] of collisionResolution.results) {
         if (result.fenceHit && kart.collisionCooldown <= 0) {
@@ -220,7 +235,7 @@ export class Game {
       this.audio.update(this.player.speed, this.input.state.throttle);
       this.particles.update(delta, this.player);
       this.cameraSystem.update(delta, this.player);
-      this.hud.update(this.race, this.player);
+      this.hud.update(this.race, this.player, this.ghostSystem);
     }
 
     if (this.race.phase !== this.lastPhase) {
@@ -233,7 +248,20 @@ export class Game {
     if (this.race.phase === 'results' && this.race.result) {
       this.hud.hide();
       this.audio.stopEngine();
-      this.results.show(this.race.result, this.activeMode, TRACK_CONFIGS[this.activeTrackId]);
+      if (this.activeMode === 'time-trial') {
+        this.lastGhostResult = this.ghostSystem.handleRaceFinish(
+          this.race.result.totalTime,
+          this.race.result.lapTimes,
+        );
+      } else {
+        this.lastGhostResult = null;
+      }
+      this.results.show(
+        this.race.result,
+        this.activeMode,
+        TRACK_CONFIGS[this.activeTrackId],
+        this.lastGhostResult,
+      );
       this.audio.finish();
     }
   }
@@ -277,8 +305,10 @@ export class Game {
         trackId: this.activeTrackId,
         player: this.player.getDebugState(),
         karts: this.race.karts.map((kart) => kart.getDebugState()),
+        ghost: this.ghostSystem.getDebugState(),
         input: { ...this.input.state },
         storage: this.records.load(this.activeTrackId),
+        ghostStorage: this.ghostSystem.storage.loadGhost(this.activeTrackId),
       }),
       advance: (seconds: number) => {
         const safeSeconds = Math.max(0, Math.min(seconds, 120));
@@ -303,7 +333,7 @@ export class Game {
         this.player.speed = 0;
         this.player.updateTrackQuery();
         this.cameraSystem.update(1 / 60, this.player);
-        this.hud.update(this.race, this.player);
+        this.hud.update(this.race, this.player, this.ghostSystem);
         return true;
       },
       resetPlayer: () => this.collision.reset(this.player),
@@ -313,12 +343,18 @@ export class Game {
         return true;
       },
       getStorage: (trackId: TrackId = this.activeTrackId) => this.records.load(trackId),
+      getGhostStorage: (trackId: TrackId = this.activeTrackId) => this.ghostSystem.storage.loadGhost(trackId),
+      setGhostEnabled: (enabled: boolean) => {
+        this.ghostSystem.setEnabled(enabled);
+        this.menu.setGhostEnabled(enabled);
+        return true;
+      },
     };
   }
 
   private syncAfterDebugCommand(): void {
     this.hud.refreshRecord(this.activeTrackId);
-    this.hud.update(this.race, this.player);
+    this.hud.update(this.race, this.player, this.ghostSystem);
     if (this.race.phase !== this.lastPhase) {
       this.handlePhaseChange();
       this.lastPhase = this.race.phase;

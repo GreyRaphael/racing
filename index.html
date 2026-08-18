@@ -67,6 +67,20 @@
               <span><strong>多人比赛</strong><small>与 3 名 AI 车手争夺冠军</small></span>
             </button>
           </div>
+
+          <div id="ghost-replay-toggle" data-testid="ghost-replay-toggle" class="ghost-replay-toggle">
+            <div class="ghost-toggle-left">
+              <span class="ghost-icon-badge">👻</span>
+              <div class="ghost-toggle-info">
+                <strong>幽灵车对决</strong>
+                <small id="menu-ghost-status" data-testid="menu-ghost-status">暂无记录</small>
+              </div>
+            </div>
+            <button id="ghost-toggle-button" data-testid="ghost-toggle-button" class="ghost-toggle-switch active" type="button" aria-pressed="true">
+              已开启
+            </button>
+          </div>
+
           <button id="start-race" data-testid="start-race" class="primary-button" type="button">开始计时赛 <span>→</span></button>
           <div class="controls-hint"><span>WASD</span> 驾驶 <span>SPACE</span> 漂移 <span>R</span> 重置</div>
         </div>
@@ -90,6 +104,11 @@
             <strong id="position-counter" data-testid="position-counter">1 <small>/ 4</small></strong>
             <span id="leader-name" class="sub-value">领先：你</span>
           </div>
+          <div id="ghost-delta-card" data-testid="ghost-delta-card" class="ghost-delta-card glass-card hidden">
+            <span class="hud-label">GHOST DELTA</span>
+            <strong id="ghost-delta" data-testid="ghost-delta">±0.00s</strong>
+            <span id="ghost-target-time" data-testid="ghost-target-time" class="sub-value">幽灵 00:00.000</span>
+          </div>
           <div class="timer-card glass-card">
             <span class="hud-label">TIME</span>
             <strong id="race-time" data-testid="race-time">00:00.000</strong>
@@ -98,7 +117,10 @@
         </div>
         <div id="countdown" data-testid="countdown" class="countdown hidden" aria-live="assertive"></div>
         <div class="hud-bottom">
-          <div class="progress-track"><span id="progress-fill"></span></div>
+          <div class="progress-track">
+            <span id="progress-fill"></span>
+            <span id="ghost-progress-marker" data-testid="ghost-progress-marker" class="ghost-progress-marker hidden">👻</span>
+          </div>
           <div class="input-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 驾驶　<kbd>SPACE</kbd> 漂移　<kbd>R</kbd> 重置</div>
           <div id="drift-indicator" data-testid="drift-indicator" class="drift-indicator">DRIFT READY</div>
         </div>
@@ -109,6 +131,15 @@
           <p class="eyebrow">FINISH LINE</p>
           <h2 id="results-title">漂亮完赛！</h2>
           <p id="results-caption" class="subtitle">你的草原圈速记录</p>
+
+          <div id="ghost-result-badge" data-testid="ghost-result-badge" class="ghost-result-badge hidden">
+            <span class="ghost-result-icon">👻</span>
+            <div class="ghost-result-text">
+              <strong id="ghost-result-title" data-testid="ghost-result-title">战胜幽灵车！</strong>
+              <small id="ghost-result-detail" data-testid="ghost-result-detail">新幽灵纪录已保存</small>
+            </div>
+          </div>
+
           <div class="result-stats">
             <div><span>总时间</span><strong id="result-total-time">00:00.000</strong></div>
             <div><span>最佳单圈</span><strong id="result-best-lap">00:00.000</strong></div>
